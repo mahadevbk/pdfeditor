@@ -78,8 +78,7 @@ def images_to_pdf(image_files):
                 f.write(img.read())
             image_paths.append(img_path)
         output = io.BytesIO()
-        with open(output, "wb") as f:
-            f.write(img2pdf.convert(image_paths))
+        output.write(img2pdf.convert(image_paths))
         output.seek(0)
         return output
 
