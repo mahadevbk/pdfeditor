@@ -1,4 +1,3 @@
-
 import streamlit as st
 import PyPDF2
 import os
@@ -16,7 +15,7 @@ import shutil
 from datetime import datetime
 
 # Set page config
-st.set_page_config(page_title="Dev's PDF Editor App", layout="wide")
+st.set_page_config(page_title="Dev's PDF Editor", layout="wide")
 
 # Function to merge PDFs
 def merge_pdfs(uploaded_files):
@@ -189,7 +188,7 @@ def extract_metadata(uploaded_file):
     return output
 
 # Streamlit UI
-st.title("PDF Editor App")
+st.title("Dev's PDF Editor")
 st.markdown("Upload PDF files or images and select an operation to manipulate your files.")
 
 operation = st.selectbox(
@@ -377,4 +376,4 @@ elif operation == "Extract Metadata":
 
 # Footer
 st.markdown("---")
-st.markdown("PDF Editor App | Built with Streamlit | © 2025")
+st.markdown("Dev's PDF Editor | Built with Streamlit | © 2025")
