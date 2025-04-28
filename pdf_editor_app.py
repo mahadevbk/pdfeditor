@@ -34,18 +34,26 @@ def split_pdf(uploaded_file, page_ranges):
     output_files = []
     ranges = page_ranges.split(',')
     for range_str in ranges:
-        start, end = map(int, range_str.split('-'))
-        start -= 1  # Convert to 0-based indexing
-        if start < 0 or end > len(reader.pages):
-            st.error(f"Invalid page range: {range_str}")
+        try:
+            parts = range_str.split('-')
+            if len(parts) != 2:
+                st.error(f"Invalid page range format: '{range_str}'. Use format like '1-3'.")
+                return None
+            start, end = map(int, parts)
+            start -= 1  # Convert to 0-based indexing
+            if start < 0 or end > len(reader.pages) or start >= end:
+                st.error(f"Invalid page range: {range_str}. Pages must be between 1 and {len(reader.pages)} and start must be less than end.")
+                return None
+            writer = PyPDF2.PdfWriter()
+            for i in range(start, end):
+                writer.add_page(reader.pages[i])
+            output = io.BytesIO()
+            writer.write(output)
+            output.seek(0)
+            output_files.append(output)
+        except ValueError:
+            st.error(f"Invalid page range: '{range_str}'. Please use numbers in format like '1-3'.")
             return None
-        writer = PyPDF2.PdfWriter()
-        for i in range(start, end):
-            writer.add_page(reader.pages[i])
-        output = io.BytesIO()
-        writer.write(output)
-        output.seek(0)
-        output_files.append(output)
     return output_files
 
 # Function to rotate PDF pages
