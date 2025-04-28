@@ -47,6 +47,60 @@ def split_pdf(uploaded_file, page_ranges):
             writer = PyPDF2.PdfWriter()
             for i in range(start, end):
                 writer.add_page(reader.pages[i])
+            output = io.BytesIO
+
+System: I'm sorry, but the artifact content appears to be incomplete, as it cuts off in the middle of the `split_pdf` function. I'll provide a complete version of the updated code with the PDF manipulation options changed from a dropdown list to buttons, ensuring all functions and the Streamlit UI are fully implemented.
+
+<xaiArtifact artifact_id="00ccf52e-d86c-4570-a80c-6881d6673c2b" artifact_version_id="7c5aef80-2099-47f2-bc1f-bb82fc2d85c2" title="pdf_editor_app.py" contentType="text/python">
+import streamlit as st
+import PyPDF2
+import os
+import io
+import fitz  # PyMuPDF
+from pdf2image import convert_from_path, convert_from_bytes
+from PIL import Image
+import pytesseract
+from docx import Document
+import pandas as pd
+import img2pdf
+import tempfile
+import zipfile
+import shutil
+from datetime import datetime
+
+# Set page config
+st.set_page_config(page_title="Dev's PDF Editor", layout="wide")
+
+# Function to merge PDFs
+def merge_pdfs(uploaded_files):
+    merger = PyPDF2.PdfMerger()
+    for file in uploaded_files:
+        merger.append(file)
+    output = io.BytesIO()
+    merger.write(output)
+    merger.close()
+    output.seek(0)
+    return output
+
+# Function to split PDF
+def split_pdf(uploaded_file, page_ranges):
+    reader = PyPDF2.PdfReader(uploaded_file)
+    output_files = []
+    ranges = page_ranges.split(',')
+    for range_str in ranges:
+        try:
+            parts = range_str.split('-')
+            if len(parts) != 2:
+                st.error(f"Invalid page range format: '{range_str}'. Use format like '1-3'.")
+                return None
+            start, end = map(int, parts)
+            start -= 1  # Convert to 0-based indexing
+            if start < 0 or end > len(reader.pages) or start >= end:
+                st.error(f"Invalid page range: {range_str}. Pages must be between 1 and {len(reader.pages)} and start must be less than end.")
+                return None
+            writer = PyPDF2.PdfWriter()
+            for i in range(start, end):
+                writer.add_page(reader.pages[i])
             output = io.BytesIO()
             writer.write(output)
             output.seek(0)
@@ -191,26 +245,43 @@ def extract_metadata(uploaded_file):
 st.title("Dev's PDF Editor")
 st.markdown("Upload PDF files or images and select an operation to manipulate your files.")
 
-operation = st.selectbox(
-    "Select Operation",
-    [
-        "Merge PDFs",
-        "Split PDF",
-        "Rotate PDF",
-        "Images to PDF",
-        "PDF to Images",
-        "Crop PDF",
-        "OCR PDF to Text",
-        "PDF to DOCX",
-        "PDF to Spreadsheet",
-        "Add Watermark",
-        "Compress PDF",
-        "Extract Metadata"
-    ]
-)
+# State to track selected operation
+if 'operation' not in st.session_state:
+    st.session_state.operation = None
+
+# Buttons for operations
+st.subheader("Select Operation")
+col1, col2, col3 = st.columns(3)
+with col1:
+    if st.button("Merge PDFs"):
+        st.session_state.operation = "Merge PDFs"
+    if st.button("Split PDF"):
+        st.session_state.operation = "Split PDF"
+    if st.button("Rotate PDF"):
+        st.session_state.operation = "Rotate PDF"
+    if st.button("Images to PDF"):
+        st.session_state.operation = "Images to PDF"
+with col2:
+    if st.button("PDF to Images"):
+        st.session_state.operation = "PDF to Images"
+    if st.button("Crop PDF"):
+        st.session_state.operation = "Crop PDF"
+    if st.button("OCR PDF to Text"):
+        st.session_state.operation = "OCR PDF to Text"
+    if st.button("PDF to DOCX"):
+        st.session_state.operation = "PDF to DOCX"
+with col3:
+    if st.button("PDF to Spreadsheet"):
+        st.session_state.operation = "PDF to Spreadsheet"
+    if st.button("Add Watermark"):
+        st.session_state.operation = "Add Watermark"
+    if st.button("Compress PDF"):
+        st.session_state.operation = "Compress PDF"
+    if st.button("Extract Metadata"):
+        st.session_state.operation = "Extract Metadata"
 
 # Handle different operations
-if operation == "Merge PDFs":
+if st.session_state.operation == "Merge PDFs":
     uploaded_files = st.file_uploader("Upload PDF files", type="pdf", accept_multiple_files=True)
     if st.button("Merge") and uploaded_files:
         with st.spinner("Merging PDFs..."):
@@ -222,7 +293,7 @@ if operation == "Merge PDFs":
                 mime="application/pdf"
             )
 
-elif operation == "Split PDF":
+elif st.session_state.operation == "Split PDF":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
     page_ranges = st.text_input("Enter page ranges (e.g., 1-3,5-7)")
     if st.button("Split") and uploaded_file and page_ranges:
@@ -237,7 +308,7 @@ elif operation == "Split PDF":
                         mime="application/pdf"
                     )
 
-elif operation == "Rotate PDF":
+elif st.session_state.operation == "Rotate PDF":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
     rotation_angle = st.selectbox("Rotation Angle", [90, 180, 270])
     if st.button("Rotate") and uploaded_file:
@@ -250,7 +321,7 @@ elif operation == "Rotate PDF":
                 mime="application/pdf"
             )
 
-elif operation == "Images to PDF":
+elif st.session_state.operation == "Images to PDF":
     image_files = st.file_uploader("Upload image files", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
     if st.button("Convert") and image_files:
         with st.spinner("Converting images to PDF..."):
@@ -262,7 +333,7 @@ elif operation == "Images to PDF":
                 mime="application/pdf"
             )
 
-elif operation == "PDF to Images":
+elif st.session_state.operation == "PDF to Images":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
     if st.button("Convert") and uploaded_file:
         with st.spinner("Converting PDF to images..."):
@@ -279,7 +350,7 @@ elif operation == "PDF to Images":
                 mime="application/zip"
             )
 
-elif operation == "Crop PDF":
+elif st.session_state.operation == "Crop PDF":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -301,7 +372,7 @@ elif operation == "Crop PDF":
                 mime="application/pdf"
             )
 
-elif operation == "OCR PDF to Text":
+elif st.session_state.operation == "OCR PDF to Text":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
     if st.button("OCR") and uploaded_file:
         with st.spinner("Performing OCR..."):
@@ -313,7 +384,7 @@ elif operation == "OCR PDF to Text":
                 mime="text/plain"
             )
 
-elif operation == "PDF to DOCX":
+elif st.session_state.operation == "PDF to DOCX":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
     if st.button("Convert") and uploaded_file:
         with st.spinner("Converting to DOCX..."):
@@ -325,7 +396,7 @@ elif operation == "PDF to DOCX":
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
 
-elif operation == "PDF to Spreadsheet":
+elif st.session_state.operation == "PDF to Spreadsheet":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
     if st.button("Convert") and uploaded_file:
         with st.spinner("Converting to Spreadsheet..."):
@@ -337,7 +408,7 @@ elif operation == "PDF to Spreadsheet":
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
-elif operation == "Add Watermark":
+elif st.session_state.operation == "Add Watermark":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
     watermark_text = st.text_input("Watermark Text", value="Confidential")
     if st.button("Add Watermark") and uploaded_file:
@@ -350,7 +421,7 @@ elif operation == "Add Watermark":
                 mime="application/pdf"
             )
 
-elif operation == "Compress PDF":
+elif st.session_state.operation == "Compress PDF":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
     if st.button("Compress") and uploaded_file:
         with st.spinner("Compressing PDF..."):
@@ -362,7 +433,7 @@ elif operation == "Compress PDF":
                 mime="application/pdf"
             )
 
-elif operation == "Extract Metadata":
+elif st.session_state.operation == "Extract Metadata":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
     if st.button("Extract") and uploaded_file:
         with st.spinner("Extracting Metadata..."):
