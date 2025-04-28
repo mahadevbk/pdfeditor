@@ -47,60 +47,6 @@ def split_pdf(uploaded_file, page_ranges):
             writer = PyPDF2.PdfWriter()
             for i in range(start, end):
                 writer.add_page(reader.pages[i])
-            output = io.BytesIO
-
-System: I'm sorry, but the artifact content appears to be incomplete, as it cuts off in the middle of the `split_pdf` function. I'll provide a complete version of the updated code with the PDF manipulation options changed from a dropdown list to buttons, ensuring all functions and the Streamlit UI are fully implemented.
-
-<xaiArtifact artifact_id="00ccf52e-d86c-4570-a80c-6881d6673c2b" artifact_version_id="7c5aef80-2099-47f2-bc1f-bb82fc2d85c2" title="pdf_editor_app.py" contentType="text/python">
-import streamlit as st
-import PyPDF2
-import os
-import io
-import fitz  # PyMuPDF
-from pdf2image import convert_from_path, convert_from_bytes
-from PIL import Image
-import pytesseract
-from docx import Document
-import pandas as pd
-import img2pdf
-import tempfile
-import zipfile
-import shutil
-from datetime import datetime
-
-# Set page config
-st.set_page_config(page_title="Dev's PDF Editor", layout="wide")
-
-# Function to merge PDFs
-def merge_pdfs(uploaded_files):
-    merger = PyPDF2.PdfMerger()
-    for file in uploaded_files:
-        merger.append(file)
-    output = io.BytesIO()
-    merger.write(output)
-    merger.close()
-    output.seek(0)
-    return output
-
-# Function to split PDF
-def split_pdf(uploaded_file, page_ranges):
-    reader = PyPDF2.PdfReader(uploaded_file)
-    output_files = []
-    ranges = page_ranges.split(',')
-    for range_str in ranges:
-        try:
-            parts = range_str.split('-')
-            if len(parts) != 2:
-                st.error(f"Invalid page range format: '{range_str}'. Use format like '1-3'.")
-                return None
-            start, end = map(int, parts)
-            start -= 1  # Convert to 0-based indexing
-            if start < 0 or end > len(reader.pages) or start >= end:
-                st.error(f"Invalid page range: {range_str}. Pages must be between 1 and {len(reader.pages)} and start must be less than end.")
-                return None
-            writer = PyPDF2.PdfWriter()
-            for i in range(start, end):
-                writer.add_page(reader.pages[i])
             output = io.BytesIO()
             writer.write(output)
             output.seek(0)
@@ -426,12 +372,12 @@ elif st.session_state.operation == "Compress PDF":
     if st.button("Compress") and uploaded_file:
         with st.spinner("Compressing PDF..."):
             output = compress_pdf(uploaded_file)
-            st.download_button(
-                label="Download Compressed PDF",
-                data=output,
-                file_name="compressed.pdf",
-                mime="application/pdf"
-            )
+        st.download_button(
+            label="Download Compressed PDF",
+            data=output,
+            file_name="compressed.pdf",
+            mime="application/pdf"
+        )
 
 elif st.session_state.operation == "Extract Metadata":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
