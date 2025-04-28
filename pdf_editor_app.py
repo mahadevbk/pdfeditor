@@ -15,7 +15,7 @@ import shutil
 from datetime import datetime
 
 # Set page config
-st.set_page_config(page_title="PDF Editor App", layout="wide")
+st.set_page_config(page_title="Dev's PDF Editor App", layout="wide")
 
 # Function to merge PDFs
 def merge_pdfs(uploaded_files):
