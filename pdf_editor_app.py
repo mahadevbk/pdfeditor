@@ -1,19 +1,19 @@
-   import streamlit as st
-   import PyPDF2
-   import os
-   import io
-   import fitz  # PyMuPDF
-   from pdf2image import convert_from_path, convert_from_bytes
-   from PIL import Image
-   import pytesseract
-   from docx import Document
-   import pandas as pd
-   import img2pdf
-   import tempfile
-   import zipfile
-   import shutil
-   from datetime import datetime
-   import re
+  import streamlit as st
+  import PyPDF2
+  import os
+  import io
+  import fitz  # PyMuPDF
+  from pdf2image import convert_from_path, convert_from_bytes
+  from PIL import Image
+  import pytesseract
+  from docx import Document
+  import pandas as pd
+  import img2pdf
+  import tempfile
+  import zipfile
+  import shutil
+  from datetime import datetime
+  import re
 
    # Set page config
    st.set_page_config(page_title="PDF Editor App", layout="wide")
