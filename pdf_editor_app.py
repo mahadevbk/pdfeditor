@@ -12,21 +12,10 @@ import img2pdf
 import tempfile
 import zipfile
 import shutil
-import ebooklib
-from ebooklib import epub
-import subprocess
-import uuid
-import mimetypes
-from contextlib import contextmanager
-
-try:
-    from pypandoc import convert_file, ensure_pandoc_installed
-    PANDOC_AVAILABLE = True
-except (ImportError, OSError):
-    PANDOC_AVAILABLE = False
 
 # ------------------ PAGE SETTINGS -------------------
 st.set_page_config(page_title="Dev's PDF Editor", layout="wide")
+#st.title("Dev's PDF Editor")
 col1, col2 = st.columns([1, 8])
 with col1:
     st.image("pdf.png", width=80)  # Adjust width as needed
@@ -35,381 +24,304 @@ with col2:
 
 st.markdown("Upload PDF files or images and select an operation to manipulate your files.")
 
-# ------------------ HELPER FUNCTIONS -------------------
-
-def check_calibre_installed():
-    """Check if Calibre's ebook-convert is available."""
-    try:
-        subprocess.run(['ebook-convert', '--version'], capture_output=True, check=True)
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return False
-
-def check_pandoc_installed():
-    """Check if Pandoc is available."""
-    try:
-        ensure_pandoc_installed()  # Ensures Pandoc binary is available
-        return True
-    except Exception:
-        return False
-
-@contextmanager
-def temp_files(*suffixes):
-    """Context manager for creating and cleaning up temporary files."""
-    files = [tempfile.NamedTemporaryFile(delete=False, suffix=suffix) for suffix in suffixes]
-    try:
-        for f in files:
-            f.close()
-        yield [f.name for f in files]
-    finally:
-        for f in files:
-            try:
-                os.unlink(f.name)
-            except OSError:
-                pass
-
-def validate_ebook_file(uploaded_file):
-    """Validate if the uploaded file is a supported eBook format."""
-    supported_formats = {'.pdf', '.epub', '.mobi', '.docx', '.txt', '.html'}
-    ext = os.path.splitext(uploaded_file.name)[1].lower()
-    if ext not in supported_formats:
-        return False, f"Unsupported file format: {ext}"
-    
-    # Optional: Check MIME type for additional validation
-    mime_type, _ = mimetypes.guess_type(uploaded_file.name)
-    if mime_type and not any(fmt in mime_type for fmt in ['pdf', 'epub', 'mobi', 'word', 'text', 'html']):
-        return False, f"Invalid file type: {mime_type}"
-    
-    return True, None
-
-def convert_ebook(uploaded_file, target_format):
-    """Convert uploaded file to target format (pdf, epub, or mobi)."""
-    try:
-        # Validate input file
-        is_valid, error_msg = validate_ebook_file(uploaded_file)
-        if not is_valid:
-            st.error(error_msg)
-            return None
-
-        # Check dependencies
-        calibre_available = check_calibre_installed()
-        pandoc_available = check_pandoc_installed()
-        if not (calibre_available or pandoc_available):
-            st.error("""
-            Conversion requires either:
-            1. Calibre - install with: `sudo apt-get install calibre`
-            2. Pandoc - install with: `pip install pypandoc` and ensure Pandoc binary is installed
-            """)
-            return None
-
-        # Create temporary files
-        input_ext = os.path.splitext(uploaded_file.name)[1].lower()
-        output_ext = f".{target_format.lower()}"
-        with temp_files(input_ext, output_ext) as (input_path, output_path):
-            # Write uploaded file to temp input
-            with open(input_path, 'wb') as f:
-                f.write(uploaded_file.read())
-
-            # Attempt conversion
-            if calibre_available:
-                try:
-                    subprocess.run([
-                        'ebook-convert',
-                        input_path,
-                        output_path,
-                        '--enable-heuristics'
-                    ], check=True, timeout=300)  # 5-minute timeout
-                except subprocess.TimeoutExpired:
-                    st.error("Conversion timed out after 5 minutes.")
-                    return None
-                except subprocess.CalledProcessError as e:
-                    st.warning(f"Calibre conversion failed: {e}. Attempting Pandoc...")
-                    calibre_available = False
-
-            if not calibre_available and pandoc_available:
-                try:
-                    convert_file(input_path, target_format.lower(), outputfile=output_path)
-                except Exception as e:
-                    st.error(f"Pandoc conversion failed: {str(e)}")
-                    return None
-
-            if not os.path.exists(output_path):
-                st.error("Conversion failed: Output file not generated.")
-                return None
-
-            # Read and return the converted file
-            with open(output_path, 'rb') as f:
-                return io.BytesIO(f.read())
-
-    except Exception as e:
-        st.error(f"Conversion failed: {str(e)}")
-        return None
-
+# ------------------ FUNCTIONS -------------------
 def merge_pdfs(uploaded_files):
-    """Merge multiple PDF files into one."""
     merger = PyPDF2.PdfMerger()
-    for uploaded_file in uploaded_files:
-        merger.append(uploaded_file)
+    for file in uploaded_files:
+        merger.append(file)
     output = io.BytesIO()
     merger.write(output)
     merger.close()
     output.seek(0)
     return output
 
-def split_pdf(uploaded_file, start_page, end_page):
-    """Split a PDF into a range of pages."""
-    pdf_reader = PyPDF2.PdfReader(uploaded_file)
-    pdf_writer = PyPDF2.PdfWriter()
-    for page_num in range(start_page - 1, end_page):
-        if page_num < len(pdf_reader.pages):
-            pdf_writer.add_page(pdf_reader.pages[page_num])
-    output = io.BytesIO()
-    pdf_writer.write(output)
-    output.seek(0)
-    return output
+def split_pdf(uploaded_file, page_ranges):
+    reader = PyPDF2.PdfReader(uploaded_file)
+    output_files = []
+    for rng in page_ranges.split(','):
+        start, end = map(int, rng.split('-'))
+        writer = PyPDF2.PdfWriter()
+        for i in range(start-1, end):
+            writer.add_page(reader.pages[i])
+        buf = io.BytesIO()
+        writer.write(buf)
+        buf.seek(0)
+        output_files.append(buf)
+    return output_files
 
-def extract_text(uploaded_file):
-    """Extract text from a PDF file."""
-    pdf_reader = PyPDF2.PdfReader(uploaded_file)
-    text = ""
-    for page in pdf_reader.pages:
-        text += page.extract_text() + "\n"
-    return text
+def rotate_pdf(uploaded_file, rotation_angle):
+    reader = PyPDF2.PdfReader(uploaded_file)
+    writer = PyPDF2.PdfWriter()
+    for page in reader.pages:
+        page.rotate(rotation_angle)
+        writer.add_page(page)
+    buf = io.BytesIO()
+    writer.write(buf)
+    buf.seek(0)
+    return buf
 
-def extract_images(uploaded_file):
-    """Extract images from a PDF file."""
-    pdf_document = fitz.open(stream=uploaded_file.read(), filetype="pdf")
-    images = []
-    for page_num in range(len(pdf_document)):
-        page = pdf_document[page_num]
-        image_list = page.get_images(full=True)
-        for img_index, img in enumerate(image_list):
-            xref = img[0]
-            base_image = pdf_document.extract_image(xref)
-            image_bytes = base_image["image"]
-            image_ext = base_image["ext"]
-            images.append((f"image_{page_num+1}_{img_index+1}.{image_ext}", image_bytes))
-    pdf_document.close()
-    return images
+def images_to_pdf(image_files):
+    with tempfile.TemporaryDirectory() as tmp:
+        paths=[]
+        for img in image_files:
+            p=os.path.join(tmp, img.name)
+            with open(p, 'wb') as f: f.write(img.read())
+            paths.append(p)
+        out=io.BytesIO()
+        out.write(img2pdf.convert(paths))
+        out.seek(0)
+        return out
 
 def pdf_to_images(uploaded_file):
-    """Convert PDF pages to images."""
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
-        temp_pdf.write(uploaded_file.read())
-        temp_pdf_path = temp_pdf.name
-    images = convert_from_path(temp_pdf_path)
-    os.unlink(temp_pdf_path)
-    output_images = []
-    for i, image in enumerate(images):
-        output = io.BytesIO()
-        image.save(output, format="PNG")
-        output.seek(0)
-        output_images.append((f"page_{i+1}.png", output))
-    return output_images
+    tmp=tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+    tmp.write(uploaded_file.read()); tmp.close()
+    imgs=convert_from_path(tmp.name); os.unlink(tmp.name)
+    outs=[]
+    for i, im in enumerate(imgs,1):
+        buf=io.BytesIO(); im.save(buf, 'PNG'); buf.seek(0)
+        outs.append((f'page_{i}.png', buf))
+    return outs
+
+def crop_pdf(uploaded_file, box):
+    doc=fitz.open(stream=uploaded_file.read(), filetype='pdf')
+    for p in doc: p.set_cropbox(fitz.Rect(*box))
+    buf=io.BytesIO(); doc.save(buf); doc.close(); buf.seek(0)
+    return buf
 
 def ocr_pdf(uploaded_file):
-    """Perform OCR on a PDF file."""
-    images = pdf_to_images(uploaded_file)
-    text = ""
-    for _, image_data in images:
-        image = Image.open(image_data)
-        text += pytesseract.image_to_string(image) + "\n"
-    return text
+    tmp=tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+    tmp.write(uploaded_file.read()); tmp.close()
+    imgs=convert_from_path(tmp.name); os.unlink(tmp.name)
+    text=''.join(pytesseract.image_to_string(i)+'\n' for i in imgs)
+    buf=io.BytesIO(); buf.write(text.encode()); buf.seek(0)
+    return buf
 
-def images_to_pdf(uploaded_files):
-    """Convert images to a single PDF."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        image_paths = []
-        for uploaded_file in uploaded_files:
-            image = Image.open(uploaded_file)
-            image_path = os.path.join(temp_dir, f"{uuid.uuid4()}.jpg")
-            image.convert("RGB").save(image_path, "JPEG")
-            image_paths.append(image_path)
-        output = io.BytesIO()
-        with open(image_paths[0], "rb") as f:
-            output.write(img2pdf.convert([f.read() for f in [open(path, "rb") for path in image_paths]]))
-        output.seek(0)
-        return output
+def pdf_to_docx(uploaded_file):
+    doc=Document(); tmp=tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+    tmp.write(uploaded_file.read()); tmp.close()
+    imgs=convert_from_path(tmp.name); os.unlink(tmp.name)
+    for im in imgs: doc.add_paragraph(pytesseract.image_to_string(im))
+    buf=io.BytesIO(); doc.save(buf); buf.seek(0)
+    return buf
 
-def export_to_docx(text):
-    """Export text to a DOCX file."""
-    doc = Document()
-    doc.add_paragraph(text)
-    output = io.BytesIO()
-    doc.save(output)
-    output.seek(0)
-    return output
+def pdf_to_spreadsheet(uploaded_file):
+    tmp=tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+    tmp.write(uploaded_file.read()); tmp.close()
+    imgs=convert_from_path(tmp.name); os.unlink(tmp.name)
+    data=[]
+    for im in imgs:
+        for ln in pytesseract.image_to_string(im).splitlines():
+            if ln.strip(): data.append(ln.split())
+    df=pd.DataFrame(data)
+    buf=io.BytesIO(); df.to_excel(buf,index=False); buf.seek(0)
+    return buf
 
-def export_to_excel(data):
-    """Export data to an Excel file."""
-    df = pd.DataFrame(data)
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False)
-    output.seek(0)
-    return output
+def add_watermark(uploaded_file, text):
+    doc=fitz.open(stream=uploaded_file.read(), filetype='pdf')
+    for p in doc: p.insert_text((50,50), text, fontsize=20, color=(0.5,0.5,0.5), rotate=45)
+    buf=io.BytesIO(); doc.save(buf); doc.close(); buf.seek(0)
+    return buf
 
-# ------------------ MAIN APP -------------------
+def compress_pdf(uploaded_file):
+    doc=fitz.open(stream=uploaded_file.read(), filetype='pdf')
+    buf=io.BytesIO(); doc.save(buf, deflate=True); doc.close(); buf.seek(0)
+    return buf
 
-op = st.selectbox(
-    "Select Operation",
-    [
-        "Merge PDFs",
-        "Split PDF",
-        "Extract Text",
-        "Extract Images",
-        "PDF to Images",
-        "OCR PDF",
-        "Images to PDF",
-        "Convert Ebook Format",
-    ],
-)
+def extract_metadata(uploaded_file):
+    md=PyPDF2.PdfReader(uploaded_file).metadata
+    txt='\n'.join(f"{k}: {v}" for k,v in md.items())
+    buf=io.BytesIO(); buf.write(txt.encode()); buf.seek(0)
+    return buf
 
-if op == "Merge PDFs":
-    uploaded_files = st.file_uploader("Upload PDF files", type="pdf", accept_multiple_files=True)
-    if uploaded_files:
-        if st.button("Merge"):
-            with st.spinner("Merging..."):
-                merged_pdf = merge_pdfs(uploaded_files)
-                st.success("✅ Merged!")
-                st.download_button(
-                    "Download Merged PDF",
-                    data=merged_pdf,
-                    file_name="merged.pdf",
-                    mime="application/pdf",
-                )
+# Advanced features
+def encrypt_pdf(uploaded_file, pwd):
+    rdr=PyPDF2.PdfReader(uploaded_file); w=PyPDF2.PdfWriter()
+    for pg in rdr.pages: w.add_page(pg)
+    w.encrypt(pwd)
+    buf=io.BytesIO(); w.write(buf); buf.seek(0)
+    return buf
 
-elif op == "Split PDF":
-    uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
-    if uploaded_file:
-        pdf_reader = PyPDF2.PdfReader(uploaded_file)
-        num_pages = len(pdf_reader.pages)
-        st.write(f"Total pages: {num_pages}")
-        start_page = st.number_input("Start page", min_value=1, max_value=num_pages, value=1)
-        end_page = st.number_input("End page", min_value=start_page, max_value=num_pages, value=num_pages)
-        if st.button("Split"):
-            with st.spinner("Splitting..."):
-                split_pdf_file = split_pdf(uploaded_file, start_page, end_page)
-                st.success("✅ Split!")
-                st.download_button(
-                    "Download Split PDF",
-                    data=split_pdf_file,
-                    file_name="split.pdf",
-                    mime="application/pdf",
-                )
+def decrypt_pdf(uploaded_file, pwd):
+    rdr=PyPDF2.PdfReader(uploaded_file)
+    if rdr.is_encrypted: rdr.decrypt(pwd)
+    w=PyPDF2.PdfWriter()
+    for pg in rdr.pages: w.add_page(pg)
+    buf=io.BytesIO(); w.write(buf); buf.seek(0)
+    return buf
 
-elif op == "Extract Text":
-    uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
-    if uploaded_file:
-        if st.button("Extract"):
-            with st.spinner("Extracting text..."):
-                text = extract_text(uploaded_file)
-                st.success("✅ Text extracted!")
-                st.text_area("Extracted Text", text, height=300)
-                docx_file = export_to_docx(text)
-                st.download_button(
-                    "Download as DOCX",
-                    data=docx_file,
-                    file_name="extracted_text.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                )
+def delete_pages(uploaded_file, pages):
+    rdr=PyPDF2.PdfReader(uploaded_file); w=PyPDF2.PdfWriter()
+    for i,pg in enumerate(rdr.pages,1):
+        if i not in pages: w.add_page(pg)
+    buf=io.BytesIO(); w.write(buf); buf.seek(0)
+    return buf
 
-elif op == "Extract Images":
-    uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
-    if uploaded_file:
-        if st.button("Extract"):
-            with st.spinner("Extracting images..."):
-                images = extract_images(uploaded_file)
-                if images:
-                    st.success("✅ Images extracted!")
-                    zip_buffer = io.BytesIO()
-                    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-                        for image_name, image_bytes in images:
-                            zip_file.writestr(image_name, image_bytes)
-                    zip_buffer.seek(0)
-                    st.download_button(
-                        "Download Images (ZIP)",
-                        data=zip_buffer,
-                        file_name="extracted_images.zip",
-                        mime="application/zip",
-                    )
-                else:
-                    st.warning("No images found in the PDF.")
+def insert_pages(base, ins, pos):
+    br=PyPDF2.PdfReader(base); ir=PyPDF2.PdfReader(ins); w=PyPDF2.PdfWriter()
+    for i in range(pos): w.add_page(br.pages[i])
+    for pg in ir.pages: w.add_page(pg)
+    for i in range(pos, len(br.pages)): w.add_page(br.pages[i])
+    buf=io.BytesIO(); w.write(buf); buf.seek(0)
+    return buf
 
-elif op == "PDF to Images":
-    uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
-    if uploaded_file:
-        if st.button("Convert"):
-            with st.spinner("Converting to images..."):
-                images = pdf_to_images(uploaded_file)
-                st.success("✅ Converted to images!")
-                zip_buffer = io.BytesIO()
-                with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-                    for image_name, image_data in images:
-                        zip_file.writestr(image_name, image_data.getvalue())
-                zip_buffer.seek(0)
-                st.download_button(
-                    "Download Images (ZIP)",
-                    data=zip_buffer,
-                    file_name="pdf_images.zip",
-                    mime="application/zip",
-                )
+def extract_images(uploaded_file):
+    doc=fitz.open(stream=uploaded_file.read(), filetype='pdf'); imgs=[]
+    for p in range(len(doc)):
+        for img in doc.get_page_images(p):
+            xref=img[0]; pix=fitz.Pixmap(doc, xref)
+            imgs.append((f'p{p+1}_x{xref}.png', pix.tobytes('png')))
+    out=io.BytesIO(); z=zipfile.ZipFile(out,'w')
+    for n,b in imgs: z.writestr(n,b)
+    z.close(); out.seek(0); return out
 
-elif op == "OCR PDF":
-    uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
-    if uploaded_file:
-        if st.button("Perform OCR"):
-            with st.spinner("Performing OCR..."):
-                text = ocr_pdf(uploaded_file)
-                st.success("✅ OCR completed!")
-                st.text_area("OCR Text", text, height=300)
-                docx_file = export_to_docx(text)
-                st.download_button(
-                    "Download as DOCX",
-                    data=docx_file,
-                    file_name="ocr_text.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                )
+def add_page_numbers(uploaded_file):
+    doc=fitz.open(stream=uploaded_file.read(), filetype='pdf')
+    for i,p in enumerate(doc,1): p.insert_text((72,20), str(i), fontsize=12)
+    buf=io.BytesIO(); doc.save(buf); doc.close(); buf.seek(0)
+    return buf
 
-elif op == "Images to PDF":
-    uploaded_files = st.file_uploader("Upload images", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
-    if uploaded_files:
-        if st.button("Convert"):
-            with st.spinner("Converting to PDF..."):
-                pdf_file = images_to_pdf(uploaded_files)
-                st.success("✅ Converted to PDF!")
-                st.download_button(
-                    "Download PDF",
-                    data=pdf_file,
-                    file_name="images_to_pdf.pdf",
-                    mime="application/pdf",
-                )
+def flatten_pdf(uploaded_file):
+    doc=fitz.open(stream=uploaded_file.read(), filetype='pdf')
+    for p in doc: p.flatten_annotations()
+    buf=io.BytesIO(); doc.save(buf); doc.close(); buf.seek(0)
+    return buf
 
-elif op == "Convert Ebook Format":
-    f = st.file_uploader("Upload file", type=['pdf', 'epub', 'mobi', 'docx', 'txt', 'html'])
-    if f:
-        target_format = st.selectbox("Convert to", ['PDF', 'EPUB', 'MOBI'])
-        
-        if not PANDOC_AVAILABLE:
-            st.warning("""
-            For best results, install Calibre:
-            ```
-            sudo apt-get install calibre
-            ```
-            or install Pandoc:
-            ```
-            pip install pypandoc
-            python -c "import pypandoc; pypandoc.ensure_pandoc_installed()"
-            ```
-            """)
-        
-        if st.button("Convert"):
-            with st.spinner("Converting..."):
-                out = convert_ebook(f, target_format.lower())
-                if out:
-                    st.success("✅ Converted!")
-                    st.download_button(
-                        "Download",
-                        data=out,
-                        file_name=f'converted.{target_format.lower()}'
-                    )
+# ------------------ SIDEBAR & MENU -------------------
+if 'operation' not in st.session_state:
+    st.session_state.operation = None
+
+st.sidebar.title("📑 Menu")
+if st.session_state.operation is None:
+    with st.sidebar.expander("🔄 Convert"):
+        if st.sidebar.button("Images to PDF", key="s_img2pdf"): st.session_state.operation="Images to PDF"
+        if st.sidebar.button("PDF to Images", key="s_pdf2img"): st.session_state.operation="PDF to Images"
+        if st.sidebar.button("PDF to DOCX", key="s_pdf2docx"): st.session_state.operation="PDF to DOCX"
+        if st.sidebar.button("PDF to Spreadsheet", key="s_pdf2xls"): st.session_state.operation="PDF to Spreadsheet"
+    with st.sidebar.expander("🔧 Edit"):
+        if st.sidebar.button("Merge PDFs", key="s_merge"): st.session_state.operation="Merge PDFs"
+        if st.sidebar.button("Split PDF", key="s_split"): st.session_state.operation="Split PDF"
+        if st.sidebar.button("Rotate PDF", key="s_rotate"): st.session_state.operation="Rotate PDF"
+        if st.sidebar.button("Crop PDF", key="s_crop"): st.session_state.operation="Crop PDF"
+        if st.sidebar.button("Add Watermark", key="s_wm"): st.session_state.operation="Add Watermark"
+        if st.sidebar.button("Compress PDF", key="s_compress"): st.session_state.operation="Compress PDF"
+    with st.sidebar.expander("🔒 Security"):
+        if st.sidebar.button("Encrypt PDF", key="s_enc"): st.session_state.operation="Encrypt PDF"
+        if st.sidebar.button("Decrypt PDF", key="s_dec"): st.session_state.operation="Decrypt PDF"
+    with st.sidebar.expander("✂️ Pages"):
+        if st.sidebar.button("Delete Pages", key="s_delpg"): st.session_state.operation="Delete Pages"
+        if st.sidebar.button("Insert Pages", key="s_inspg"): st.session_state.operation="Insert Pages"
+        if st.sidebar.button("Add Page Numbers", key="s_pgnum"): st.session_state.operation="Add Page Numbers"
+        if st.sidebar.button("Flatten PDF", key="s_flatten"): st.session_state.operation="Flatten PDF"
+    with st.sidebar.expander("🖼️ Images"):
+        if st.sidebar.button("Extract Images", key="s_extimg"): st.session_state.operation="Extract Images"
+    with st.sidebar.expander("🔍 Extract"):
+        if st.sidebar.button("OCR PDF to Text", key="s_ocr"): st.session_state.operation="OCR PDF to Text"
+        if st.sidebar.button("Extract Metadata", key="s_meta"): st.session_state.operation="Extract Metadata"
+else:
+    if st.sidebar.button("⬅️ Back to Menu", key="s_back"): st.session_state.operation=None
+
+# ------------------ MAIN UI -------------------
+op=st.session_state.operation
+if not op:
+    st.write("Select an operation from the sidebar to get started.")
+else:
+    st.subheader(f"▶️ Current Operation: {op}")
+    # Basic operations
+    if op=="Images to PDF":
+        imgs=st.file_uploader("Upload images", accept_multiple_files=True,type=['png','jpg','jpeg'])
+        if st.button("Convert Images to PDF") and imgs:
+            out=images_to_pdf(imgs); st.success("✅ Converted!"); st.download_button("Download PDF",data=out,file_name='images.pdf')
+    elif op=="PDF to Images":
+        f=st.file_uploader("Upload PDF", type='pdf')
+        if st.button("Convert PDF to Images") and f:
+            outs=pdf_to_images(f); buf=io.BytesIO();
+            with zipfile.ZipFile(buf,'w') as z:
+                for n,b in outs: z.writestr(n,b.getvalue())
+            buf.seek(0); st.success("✅ Converted!"); st.download_button("Download ZIP",data=buf,file_name='pages.zip')
+    elif op=="PDF to DOCX":
+        f=st.file_uploader("Upload PDF", type='pdf')
+        if st.button("Convert to DOCX") and f:
+            out=pdf_to_docx(f); st.success("✅ Converted!"); st.download_button("Download DOCX",data=out,file_name='out.docx')
+    elif op=="PDF to Spreadsheet":
+        f=st.file_uploader("Upload PDF", type='pdf')
+        if st.button("Convert to XLSX") and f:
+            out=pdf_to_spreadsheet(f); st.success("✅ Converted!"); st.download_button("Download XLSX",data=out,file_name='out.xlsx')
+    elif op=="Merge PDFs":
+        fs=st.file_uploader("Upload PDFs", accept_multiple_files=True,type='pdf')
+        if st.button("Merge PDFs") and fs:
+            out=merge_pdfs(fs); st.success("✅ Merged!"); st.download_button("Download",data=out,file_name='merged.pdf')
+    elif op=="Split PDF":
+        f=st.file_uploader("Upload PDF", type='pdf')
+        rng=st.text_input("Ranges e.g. 1-3,5-7")
+        if st.button("Split PDF") and f and rng:
+            ofs=split_pdf(f,rng); st.success("✅ Split!")
+            for i,b in enumerate(ofs,1): st.download_button(f"Part {i}",data=b,file_name=f'part{i}.pdf')
+    elif op=="Rotate PDF":
+        f=st.file_uploader("Upload PDF", type='pdf')
+        ang=st.selectbox("Angle",[90,180,270])
+        if st.button("Rotate PDF") and f:
+            out=rotate_pdf(f,ang); st.success("✅ Rotated!"); st.download_button("Download",data=out,file_name='rotated.pdf')
+    elif op=="Crop PDF":
+        f=st.file_uploader("Upload PDF", type='pdf')
+        c1,c2,c3,c4=st.columns(4)
+        x0=c1.number_input("X0",value=0.0)
+        y0=c2.number_input("Y0",value=0.0)
+        x1=c3.number_input("X1",value=612.0)
+        y1=c4.number_input("Y1",value=792.0)
+        if st.button("Crop PDF") and f:
+            out=crop_pdf(f,(x0,y0,x1,y1)); st.success("✅ Cropped!"); st.download_button("Download",data=out,file_name='cropped.pdf')
+    elif op=="Add Watermark":
+        f=st.file_uploader("Upload PDF", type='pdf')
+        txt=st.text_input("Watermark Text","Confidential")
+        if st.button("Add Watermark") and f:
+            out=add_watermark(f,txt); st.success("✅ Watermarked!"); st.download_button("Download",data=out,file_name='wm.pdf')
+    elif op=="Compress PDF":
+        f=st.file_uploader("Upload PDF", type='pdf')
+        if st.button("Compress PDF") and f:
+            out=compress_pdf(f); st.success("✅ Compressed!"); st.download_button("Download",data=out,file_name='compressed.pdf')
+    elif op=="Extract Metadata":
+        f=st.file_uploader("Upload PDF", type='pdf')
+        if st.button("Extract Metadata") and f:
+            out=extract_metadata(f); st.success("✅ Metadata!"); st.download_button("Download",data=out,file_name='metadata.txt')
+    # Advanced
+    elif op=="Encrypt PDF":
+        f=st.file_uploader("Upload PDF to Encrypt", type='pdf')
+        pwd=st.text_input("Password", type='password')
+        if st.button("Encrypt PDF") and f and pwd:
+            out=encrypt_pdf(f,pwd); st.success("✅ Encrypted!"); st.download_button("Download",data=out,file_name='encrypted.pdf')
+    elif op=="Decrypt PDF":
+        f=st.file_uploader("Upload Encrypted PDF", type='pdf')
+        pwd=st.text_input("Password", type='password')
+        if st.button("Decrypt PDF") and f and pwd:
+            out=decrypt_pdf(f,pwd); st.success("✅ Decrypted!"); st.download_button("Download",data=out,file_name='decrypted.pdf')
+    elif op=="Delete Pages":
+        f=st.file_uploader("Upload PDF", type='pdf')
+        rng=st.text_input("Pages to delete, e.g. 1,3,5")
+        if st.button("Delete Pages") and f and rng:
+            try:
+                pages=[int(x) for x in rng.split(',')]
+                out=delete_pages(f,pages); st.success("✅ Pages deleted!"); st.download_button("Download",data=out,file_name='deleted.pdf')
+            except:
+                st.error("Invalid pages input")
+    elif op=="Insert Pages":
+        base=st.file_uploader("Upload Base PDF", type='pdf')
+        ins=st.file_uploader("Upload PDF to Insert", type='pdf')
+        pos=st.number_input("Position (0-based)",min_value=0,step=1)
+        if st.button("Insert Pages") and base and ins:
+            out=insert_pages(base,ins,pos); st.success("✅ Pages inserted!"); st.download_button("Download",data=out,file_name='inserted.pdf')
+    elif op=="Extract Images":
+        f=st.file_uploader("Upload PDF", type='pdf')
+        if st.button("Extract Images") and f:
+            out=extract_images(f); st.success("✅ Images extracted!"); st.download_button("Download ZIP",data=out,file_name='images.zip')
+    elif op=="Add Page Numbers":
+        f=st.file_uploader("Upload PDF", type='pdf')
+        if st.button("Add Page Numbers") and f:
+            out=add_page_numbers(f); st.success("✅ Page numbers added!"); st.download_button("Download",data=out,file_name='pgnums.pdf')
+    elif op=="Flatten PDF":
+        f=st.file_uploader("Upload PDF to Flatten", type='pdf')
+        if st.button("Flatten PDF") and f:
+            out=flatten_pdf(f); st.success("✅ PDF flattened!"); st.download_button("Download",data=out,file_name='flattened.pdf')
+
+# ------------------ FOOTER -------------------
+st.markdown("---")
+st.markdown("Dev's PDF Editor | © 2025")
