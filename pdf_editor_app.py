@@ -28,35 +28,35 @@ st.markdown("Upload PDF files or images and select an operation to manipulate yo
 # Sidebar buttons for operations
 st.sidebar.title("Select an Operation")
 operation = None
-if st.sidebar.button("Merge PDFs"):
+if st.sidebar.button("Merge PDFs", key="sidebar_merge"):
     operation = "Merge PDFs"
-elif st.sidebar.button("Split PDF"):
+elif st.sidebar.button("Split PDF", key="sidebar_split"):
     operation = "Split PDF"
-elif st.sidebar.button("Rotate PDF"):
+elif st.sidebar.button("Rotate PDF", key="sidebar_rotate"):
     operation = "Rotate PDF"
-elif st.sidebar.button("Images to PDF"):
+elif st.sidebar.button("Images to PDF", key="sidebar_images_to_pdf"):
     operation = "Images to PDF"
-elif st.sidebar.button("PDF to Images"):
+elif st.sidebar.button("PDF to Images", key="sidebar_pdf_to_images"):
     operation = "PDF to Images"
-elif st.sidebar.button("Crop PDF"):
+elif st.sidebar.button("Crop PDF", key="sidebar_crop"):
     operation = "Crop PDF"
-elif st.sidebar.button("OCR PDF to Text"):
+elif st.sidebar.button("OCR PDF to Text", key="sidebar_ocr"):
     operation = "OCR PDF to Text"
-elif st.sidebar.button("PDF to DOCX"):
+elif st.sidebar.button("PDF to DOCX", key="sidebar_pdf_to_docx"):
     operation = "PDF to DOCX"
-elif st.sidebar.button("PDF to Spreadsheet"):
+elif st.sidebar.button("PDF to Spreadsheet", key="sidebar_pdf_to_spreadsheet"):
     operation = "PDF to Spreadsheet"
-elif st.sidebar.button("Add Watermark"):
+elif st.sidebar.button("Add Watermark", key="sidebar_add_watermark"):
     operation = "Add Watermark"
-elif st.sidebar.button("Compress PDF"):
+elif st.sidebar.button("Compress PDF", key="sidebar_compress"):
     operation = "Compress PDF"
-elif st.sidebar.button("Extract Metadata"):
+elif st.sidebar.button("Extract Metadata", key="sidebar_extract_metadata"):
     operation = "Extract Metadata"
 
 # Handle different operations
 if operation == "Merge PDFs":
     uploaded_files = st.file_uploader("Upload PDF files", type="pdf", accept_multiple_files=True)
-    if st.button("Merge PDFs") and uploaded_files:
+    if st.button("Merge PDFs", key="main_merge") and uploaded_files:
         with st.spinner("Merging PDFs..."):
             output = merge_pdfs(uploaded_files)
             st.download_button("Download Merged PDF", data=output, file_name="merged.pdf", mime="application/pdf")
@@ -64,7 +64,7 @@ if operation == "Merge PDFs":
 elif operation == "Split PDF":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
     page_ranges = st.text_input("Enter page ranges (e.g., 1-3,5-7)")
-    if st.button("Split PDF") and uploaded_file and page_ranges:
+    if st.button("Split PDF", key="main_split") and uploaded_file and page_ranges:
         with st.spinner("Splitting PDF..."):
             output_files = split_pdf(uploaded_file, page_ranges)
             if output_files:
@@ -74,21 +74,21 @@ elif operation == "Split PDF":
 elif operation == "Rotate PDF":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
     rotation_angle = st.selectbox("Rotation Angle", [90, 180, 270])
-    if st.button("Rotate PDF") and uploaded_file:
+    if st.button("Rotate PDF", key="main_rotate") and uploaded_file:
         with st.spinner("Rotating PDF..."):
             output = rotate_pdf(uploaded_file, rotation_angle)
             st.download_button("Download Rotated PDF", data=output, file_name="rotated.pdf", mime="application/pdf")
 
 elif operation == "Images to PDF":
     image_files = st.file_uploader("Upload image files", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
-    if st.button("Convert Images to PDF") and image_files:
+    if st.button("Convert Images to PDF", key="main_images_to_pdf") and image_files:
         with st.spinner("Converting images to PDF..."):
             output = images_to_pdf(image_files)
             st.download_button("Download PDF", data=output, file_name="images_to_pdf.pdf", mime="application/pdf")
 
 elif operation == "PDF to Images":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
-    if st.button("Convert PDF to Images") and uploaded_file:
+    if st.button("Convert PDF to Images", key="main_pdf_to_images") and uploaded_file:
         with st.spinner("Converting PDF to images..."):
             output_files = pdf_to_images(uploaded_file)
             zip_buffer = io.BytesIO()
@@ -110,28 +110,28 @@ elif operation == "Crop PDF":
     with col4:
         y1 = st.number_input("Y1 (bottom)", value=750.0)
     crop_box = (x0, y0, x1, y1)
-    if st.button("Crop PDF") and uploaded_file:
+    if st.button("Crop PDF", key="main_crop") and uploaded_file:
         with st.spinner("Cropping PDF..."):
             output = crop_pdf(uploaded_file, crop_box)
             st.download_button("Download Cropped PDF", data=output, file_name="cropped.pdf", mime="application/pdf")
 
 elif operation == "OCR PDF to Text":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
-    if st.button("Perform OCR on PDF") and uploaded_file:
+    if st.button("Perform OCR on PDF", key="main_ocr") and uploaded_file:
         with st.spinner("Performing OCR..."):
             output = ocr_pdf(uploaded_file)
             st.download_button("Download Text File", data=output, file_name="ocr_output.txt", mime="text/plain")
 
 elif operation == "PDF to DOCX":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
-    if st.button("Convert PDF to DOCX") and uploaded_file:
+    if st.button("Convert PDF to DOCX", key="main_pdf_to_docx") and uploaded_file:
         with st.spinner("Converting to DOCX..."):
             output = pdf_to_docx(uploaded_file)
             st.download_button("Download DOCX", data=output, file_name="output.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
 elif operation == "PDF to Spreadsheet":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
-    if st.button("Convert PDF to Spreadsheet") and uploaded_file:
+    if st.button("Convert PDF to Spreadsheet", key="main_pdf_to_spreadsheet") and uploaded_file:
         with st.spinner("Converting to Spreadsheet..."):
             output = pdf_to_spreadsheet(uploaded_file)
             st.download_button("Download Spreadsheet", data=output, file_name="output.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -139,21 +139,21 @@ elif operation == "PDF to Spreadsheet":
 elif operation == "Add Watermark":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
     watermark_text = st.text_input("Watermark Text", value="Confidential")
-    if st.button("Add Watermark to PDF") and uploaded_file:
+    if st.button("Add Watermark to PDF", key="main_add_watermark") and uploaded_file:
         with st.spinner("Adding Watermark..."):
             output = add_watermark(uploaded_file, watermark_text)
             st.download_button("Download Watermarked PDF", data=output, file_name="watermarked.pdf", mime="application/pdf")
 
 elif operation == "Compress PDF":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
-    if st.button("Compress PDF") and uploaded_file:
+    if st.button("Compress PDF", key="main_compress") and uploaded_file:
         with st.spinner("Compressing PDF..."):
             output = compress_pdf(uploaded_file)
             st.download_button("Download Compressed PDF", data=output, file_name="compressed.pdf", mime="application/pdf")
 
 elif operation == "Extract Metadata":
     uploaded_file = st.file_uploader("Upload PDF file", type="pdf")
-    if st.button("Extract PDF Metadata") and uploaded_file:
+    if st.button("Extract PDF Metadata", key="main_extract_metadata") and uploaded_file:
         with st.spinner("Extracting Metadata..."):
             output = extract_metadata(uploaded_file)
             st.download_button("Download Metadata", data=output, file_name="metadata.txt", mime="text/plain")
