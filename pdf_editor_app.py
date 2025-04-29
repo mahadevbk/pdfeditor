@@ -25,23 +25,33 @@ st.set_page_config(page_title="Dev's PDF Editor", layout="wide")
 st.title("Dev's PDF Editor")
 st.markdown("Upload PDF files or images and select an operation to manipulate your files.")
 
-operation = st.selectbox(
-    "Select Operation",
-    [
-        "Merge PDFs",
-        "Split PDF",
-        "Rotate PDF",
-        "Images to PDF",
-        "PDF to Images",
-        "Crop PDF",
-        "OCR PDF to Text",
-        "PDF to DOCX",
-        "PDF to Spreadsheet",
-        "Add Watermark",
-        "Compress PDF",
-        "Extract Metadata"
-    ]
-)
+# Sidebar buttons for operations
+st.sidebar.title("Select an Operation")
+operation = None
+if st.sidebar.button("Merge PDFs"):
+    operation = "Merge PDFs"
+elif st.sidebar.button("Split PDF"):
+    operation = "Split PDF"
+elif st.sidebar.button("Rotate PDF"):
+    operation = "Rotate PDF"
+elif st.sidebar.button("Images to PDF"):
+    operation = "Images to PDF"
+elif st.sidebar.button("PDF to Images"):
+    operation = "PDF to Images"
+elif st.sidebar.button("Crop PDF"):
+    operation = "Crop PDF"
+elif st.sidebar.button("OCR PDF to Text"):
+    operation = "OCR PDF to Text"
+elif st.sidebar.button("PDF to DOCX"):
+    operation = "PDF to DOCX"
+elif st.sidebar.button("PDF to Spreadsheet"):
+    operation = "PDF to Spreadsheet"
+elif st.sidebar.button("Add Watermark"):
+    operation = "Add Watermark"
+elif st.sidebar.button("Compress PDF"):
+    operation = "Compress PDF"
+elif st.sidebar.button("Extract Metadata"):
+    operation = "Extract Metadata"
 
 # Handle different operations
 if operation == "Merge PDFs":
