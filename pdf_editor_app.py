@@ -3,7 +3,7 @@ import PyPDF2
 import os
 import io
 import fitz  # PyMuPDF
-from pdf2image import convert_from_path, convert_from_bytes
+from pdf2image import convert_from_path
 from PIL import Image
 import pytesseract
 from docx import Document
@@ -12,14 +12,13 @@ import img2pdf
 import tempfile
 import zipfile
 import shutil
-from datetime import datetime
 
-# ------------------- PAGE CONFIG -------------------
+# ------------------ PAGE SETTINGS -------------------
 st.set_page_config(page_title="Dev's PDF Editor", layout="wide")
 st.title("Dev's PDF Editor")
 st.markdown("Upload PDF files or images and select an operation to manipulate your files.")
 
-# ------------------- FUNCTIONS -------------------
+# ------------------ FUNCTIONS -------------------
 
 # Merge PDFs
 def merge_pdfs(uploaded_files):
@@ -181,18 +180,19 @@ def extract_metadata(uploaded_file):
     output.seek(0)
     return output
 
-# New Features
+# Encrypt PDF
 def encrypt_pdf(uploaded_file, password):
     reader = PyPDF2.PdfReader(uploaded_file)
     writer = PyPDF2.PdfWriter()
     for page in reader.pages:
         writer.add_page(page)
-    output = io.BytesIO()
     writer.encrypt(password)
+    output = io.BytesIO()
     writer.write(output)
     output.seek(0)
     return output
 
+# Decrypt PDF
 def decrypt_pdf(uploaded_file, password):
     reader = PyPDF2.PdfReader(uploaded_file)
     if reader.is_encrypted:
@@ -205,17 +205,19 @@ def decrypt_pdf(uploaded_file, password):
     output.seek(0)
     return output
 
+# Delete Pages
 def delete_pages(uploaded_file, pages_to_delete):
     reader = PyPDF2.PdfReader(uploaded_file)
     writer = PyPDF2.PdfWriter()
     for i, page in enumerate(reader.pages):
-        if (i+1) not in pages_to_delete:
+        if (i + 1) not in pages_to_delete:
             writer.add_page(page)
     output = io.BytesIO()
     writer.write(output)
     output.seek(0)
     return output
 
+# Insert Pages
 def insert_pages(base_file, insert_file, position):
     base_reader = PyPDF2.PdfReader(base_file)
     insert_reader = PyPDF2.PdfReader(insert_file)
@@ -231,6 +233,7 @@ def insert_pages(base_file, insert_file, position):
     output.seek(0)
     return output
 
+# Extract Images
 def extract_images(uploaded_file):
     doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
     images = []
@@ -247,6 +250,7 @@ def extract_images(uploaded_file):
     output_zip.seek(0)
     return output_zip
 
+# Add Page Numbers
 def add_page_numbers(uploaded_file):
     doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
     for page_num, page in enumerate(doc, start=1):
@@ -257,6 +261,7 @@ def add_page_numbers(uploaded_file):
     output.seek(0)
     return output
 
+# Flatten PDF
 def flatten_pdf(uploaded_file):
     doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
     for page in doc:
@@ -266,64 +271,3 @@ def flatten_pdf(uploaded_file):
     doc.close()
     output.seek(0)
     return output
-# ------------------- SIDEBAR AND MENU -------------------
-
-# Initialize session state
-if "operation" not in st.session_state:
-    st.session_state.operation = None
-
-st.sidebar.title("📑 Menu")
-
-if st.session_state.operation is None:
-    with st.sidebar.expander("🔄 Convert"):
-        if st.sidebar.button("Images to PDF", key="sidebar_images_to_pdf"):
-            st.session_state.operation = "Images to PDF"
-        if st.sidebar.button("PDF to Images", key="sidebar_pdf_to_images"):
-            st.session_state.operation = "PDF to Images"
-        if st.sidebar.button("PDF to DOCX", key="sidebar_pdf_to_docx"):
-            st.session_state.operation = "PDF to DOCX"
-        if st.sidebar.button("PDF to Spreadsheet", key="sidebar_pdf_to_spreadsheet"):
-            st.session_state.operation = "PDF to Spreadsheet"
-
-    with st.sidebar.expander("🔧 Edit"):
-        if st.sidebar.button("Merge PDFs", key="sidebar_merge"):
-            st.session_state.operation = "Merge PDFs"
-        if st.sidebar.button("Split PDF", key="sidebar_split"):
-            st.session_state.operation = "Split PDF"
-        if st.sidebar.button("Rotate PDF", key="sidebar_rotate"):
-            st.session_state.operation = "Rotate PDF"
-        if st.sidebar.button("Crop PDF", key="sidebar_crop"):
-            st.session_state.operation = "Crop PDF"
-        if st.sidebar.button("Add Watermark", key="sidebar_add_watermark"):
-            st.session_state.operation = "Add Watermark"
-        if st.sidebar.button("Compress PDF", key="sidebar_compress"):
-            st.session_state.operation = "Compress PDF"
-
-    with st.sidebar.expander("🔒 Security"):
-        if st.sidebar.button("Encrypt PDF", key="sidebar_encrypt_pdf"):
-            st.session_state.operation = "Encrypt PDF"
-        if st.sidebar.button("Decrypt PDF", key="sidebar_decrypt_pdf"):
-            st.session_state.operation = "Decrypt PDF"
-
-    with st.sidebar.expander("✂️ Pages"):
-        if st.sidebar.button("Delete Pages", key="sidebar_delete_pages"):
-            st.session_state.operation = "Delete Pages"
-        if st.sidebar.button("Insert Pages", key="sidebar_insert_pages"):
-            st.session_state.operation = "Insert Pages"
-        if st.sidebar.button("Add Page Numbers", key="sidebar_add_page_numbers"):
-            st.session_state.operation = "Add Page Numbers"
-        if st.sidebar.button("Flatten PDF", key="sidebar_flatten_pdf"):
-            st.session_state.operation = "Flatten PDF"
-
-    with st.sidebar.expander("🖼️ Images"):
-        if st.sidebar.button("Extract Images", key="sidebar_extract_images"):
-            st.session_state.operation = "Extract Images"
-
-    with st.sidebar.expander("🔍 Extract"):
-        if st.sidebar.button("OCR PDF to Text", key="sidebar_ocr"):
-            st.session_state.operation = "OCR PDF to Text"
-        if st.sidebar.button("Extract Metadata", key="sidebar_extract_metadata"):
-            st.session_state.operation = "Extract Metadata"
-else:
-    if st.sidebar.button("⬅️ Back to Menu", key="sidebar_back"):
-        st.session_state.operation = None
