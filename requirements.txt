@@ -11,3 +11,4 @@ openpyxl>=3.1.2
 ebooklib
 pypandoc
 pandoc
+wheels
