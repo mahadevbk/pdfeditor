@@ -12,10 +12,14 @@ import img2pdf
 import tempfile
 import zipfile
 import shutil
+import ebooklib
+from ebooklib import epub
+from pypandoc import convert_file
+import subprocess
+import uuid
 
 # ------------------ PAGE SETTINGS -------------------
 st.set_page_config(page_title="Dev's PDF Editor", layout="wide")
-#st.title("Dev's PDF Editor")
 col1, col2 = st.columns([1, 8])
 with col1:
     st.image("pdf.png", width=80)  # Adjust width as needed
@@ -133,7 +137,6 @@ def extract_metadata(uploaded_file):
     buf=io.BytesIO(); buf.write(txt.encode()); buf.seek(0)
     return buf
 
-# Advanced features
 def encrypt_pdf(uploaded_file, pwd):
     rdr=PyPDF2.PdfReader(uploaded_file); w=PyPDF2.PdfWriter()
     for pg in rdr.pages: w.add_page(pg)
@@ -186,6 +189,47 @@ def flatten_pdf(uploaded_file):
     buf=io.BytesIO(); doc.save(buf); doc.close(); buf.seek(0)
     return buf
 
+def convert_ebook(uploaded_file, target_format):
+    """Convert uploaded file to target format (pdf, mobi, or epub)"""
+    try:
+        # Create temp files
+        input_ext = os.path.splitext(uploaded_file.name)[1].lower()
+        input_file = tempfile.NamedTemporaryFile(delete=False, suffix=input_ext)
+        input_file.write(uploaded_file.read())
+        input_file.close()
+        
+        output_ext = f".{target_format.lower()}"
+        output_file = tempfile.NamedTemporaryFile(delete=False, suffix=output_ext)
+        output_file.close()
+        
+        # Convert using calibre's ebook-convert if available
+        try:
+            subprocess.run([
+                'ebook-convert', 
+                input_file.name, 
+                output_file.name,
+                '--enable-heuristics'
+            ], check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # Fallback to pypandoc if calibre not available
+            if target_format.lower() == 'pdf':
+                convert_file(input_file.name, 'pdf', outputfile=output_file.name)
+            else:
+                convert_file(input_file.name, target_format, outputfile=output_file.name)
+        
+        # Read the converted file
+        with open(output_file.name, 'rb') as f:
+            result = io.BytesIO(f.read())
+        
+        # Cleanup
+        os.unlink(input_file.name)
+        os.unlink(output_file.name)
+        
+        return result
+    except Exception as e:
+        st.error(f"Conversion failed: {str(e)}")
+        return None
+
 # ------------------ SIDEBAR & MENU -------------------
 if 'operation' not in st.session_state:
     st.session_state.operation = None
@@ -197,6 +241,7 @@ if st.session_state.operation is None:
         if st.sidebar.button("PDF to Images", key="s_pdf2img"): st.session_state.operation="PDF to Images"
         if st.sidebar.button("PDF to DOCX", key="s_pdf2docx"): st.session_state.operation="PDF to DOCX"
         if st.sidebar.button("PDF to Spreadsheet", key="s_pdf2xls"): st.session_state.operation="PDF to Spreadsheet"
+        if st.sidebar.button("Convert Ebook Format", key="s_ebook"): st.session_state.operation="Convert Ebook Format"
     with st.sidebar.expander("🔧 Edit"):
         if st.sidebar.button("Merge PDFs", key="s_merge"): st.session_state.operation="Merge PDFs"
         if st.sidebar.button("Split PDF", key="s_split"): st.session_state.operation="Split PDF"
@@ -321,6 +366,20 @@ else:
         f=st.file_uploader("Upload PDF to Flatten", type='pdf')
         if st.button("Flatten PDF") and f:
             out=flatten_pdf(f); st.success("✅ PDF flattened!"); st.download_button("Download",data=out,file_name='flattened.pdf')
+    elif op=="Convert Ebook Format":
+        f=st.file_uploader("Upload file", type=['pdf', 'epub', 'mobi', 'docx', 'txt', 'html'])
+        if f:
+            target_format = st.selectbox("Convert to", ['PDF', 'EPUB', 'MOBI'])
+            if st.button("Convert"):
+                with st.spinner("Converting..."):
+                    out = convert_ebook(f, target_format.lower())
+                    if out:
+                        st.success("✅ Converted!")
+                        st.download_button(
+                            "Download",
+                            data=out,
+                            file_name=f'converted.{target_format.lower()}'
+                        )
 
 # ------------------ FOOTER -------------------
 st.markdown("---")
