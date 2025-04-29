@@ -18,7 +18,7 @@ st.set_page_config(page_title="Dev's PDF Editor", layout="wide")
 #st.title("Dev's PDF Editor")
 col1, col2 = st.columns([1, 8])
 with col1:
-    st.image("dev.png", width=80)  # Adjust width as needed
+    st.image("pdf.png", width=80)  # Adjust width as needed
 with col2:
     st.title("Dev's PDF Editor")
 
