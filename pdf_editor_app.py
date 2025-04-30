@@ -191,6 +191,8 @@ if 'operation' not in st.session_state:
     st.session_state.operation = None
 
 st.sidebar.title("📑 Menu")
+if st.sidebar.button("Convert eBook Format", key="s_ebookconv"):
+    st.session_state.operation = "Convert eBook Format"
 if st.session_state.operation is None:
     with st.sidebar.expander("🔄 Convert"):
         if st.sidebar.button("Images to PDF", key="s_img2pdf"): st.session_state.operation="Images to PDF"
@@ -321,6 +323,34 @@ else:
         f=st.file_uploader("Upload PDF to Flatten", type='pdf')
         if st.button("Flatten PDF") and f:
             out=flatten_pdf(f); st.success("✅ PDF flattened!"); st.download_button("Download",data=out,file_name='flattened.pdf')
+	elif op == "Convert eBook Format":
+	    import requests
+
+	    f = st.file_uploader("Upload eBook", type=[
+	        "epub", "pdf", "mobi", "azw3", "docx", "txt", "lit", "fb2", "rtf", "html", "odt"
+	    ])
+	    target_fmt = st.selectbox("Convert to format", [
+	        "epub", "pdf", "mobi", "azw3", "txt", "htmlz", "lit", "fb2", "docx"
+	    ])
+    
+	    if st.button("Convert eBook") and f:
+	        with st.spinner("Sending to backend for conversion..."):
+	            files = {'file': (f.name, f, f.type)}
+	            try:
+	                response = requests.post(
+	                    "https://render-ebookconversion-backend.onrender.com/convert",
+	                    files=files,
+        	            params={"output_format": target_fmt},
+          	          timeout=60
+         	       )
+           	     if response.status_code == 200:
+            	        st.success("✅ Conversion successful!")
+             	       outname = f.name.rsplit('.', 1)[0] + "." + target_fmt
+            	        st.download_button("Download Converted File", data=response.content, file_name=outname)
+            	    else:
+                    st.error(f"❌ Conversion failed: {response.status_code}")
+          	  except Exception as e:
+         	       st.error(f"⚠️ Error contacting backend: {e}")
 
 # ------------------ FOOTER -------------------
 st.markdown("---")
