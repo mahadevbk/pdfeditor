@@ -279,8 +279,6 @@ if 'operation' not in st.session_state:
 st.sidebar.title("📑 Menu")
 if st.session_state.operation is None:
     with st.sidebar.expander("🔄 Convert"):
-        if st.sidebar.button("Ebook Converter", key="s_ebook"):
-            st.session_state.operation = "Convert Ebook"
         if st.sidebar.button("Images to PDF", key="s_img2pdf"):
             st.session_state.operation = "Images to PDF"
         if st.sidebar.button("PDF to Images", key="s_pdf2img"):
@@ -324,6 +322,8 @@ if st.session_state.operation is None:
             st.session_state.operation = "OCR PDF to Text"
         if st.sidebar.button("Extract Metadata", key="s_meta"):
             st.session_state.operation = "Extract Metadata"
+        if st.sidebar.button("Ebook Converter", key="s_ebook"):
+            st.session_state.operation = "Convert Ebook"    
 else:
     if st.sidebar.button("⬅️ Back to Menu", key="s_back"):
         st.session_state.operation = None
