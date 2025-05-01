@@ -324,4 +324,4 @@ else:
 
 # ------------------ FOOTER -------------------
 st.markdown("---")
-st.markdown("Dev's PDF Editor | © 2025")
+st.markdown("Dev's PDF Editor Fork it from https://github.com/mahadevbk/pdfeditor")
