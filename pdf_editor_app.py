@@ -337,7 +337,7 @@ if not op:
 else:
     st.subheader(f"▶️ Current Operation: {op}")
     # Basic operations
-    if op == "Convert Ebook (code works but not on Streamlit cloud )":
+    if op == "Convert Ebook":
         f = st.file_uploader("Upload ebook file", type=['pdf', 'epub', 'mobi', 'azw3', 'docx', 'html', 'txt'])
         out_format = st.selectbox("Output format", ['epub', 'pdf', 'mobi', 'azw3', 'docx', 'htmlz', 'txt'])
         if st.button("Convert") and f:
@@ -346,7 +346,7 @@ else:
                 st.success("✅ Ebook converted successfully!")
                 st.download_button("Download", data=converted_data, file_name=f'converted.{out_format}')
             except Exception as e:
-                st.error(f"❌ Conversion failed: {e}")
+                st.error(f"❌ Conversion failed, Code works but not on Streamlit cloud. Download repo and run on local machine for it to work : {e}")
     elif op == "Images to PDF":
         imgs = st.file_uploader("Upload images", accept_multiple_files=True, type=['png', 'jpg', 'jpeg'])
         if st.button("Convert Images to PDF") and imgs:
