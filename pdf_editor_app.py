@@ -279,6 +279,10 @@ if 'operation' not in st.session_state:
 st.sidebar.title("📑 Menu")
 if st.session_state.operation is None:
     with st.sidebar.expander("🔄 Convert"):
+        if st.sidebar.button("Ebook Converter", key="s_ebook"):
+            st.session_state.operation = "Convert Ebook"
+        if st.sidebar.button("Image to Text", key="s_ocr_img"):
+            st.session_state.operation = "OCR Image to Text"
         if st.sidebar.button("Images to PDF", key="s_img2pdf"):
             st.session_state.operation = "Images to PDF"
         if st.sidebar.button("PDF to Images", key="s_pdf2img"):
@@ -322,8 +326,6 @@ if st.session_state.operation is None:
             st.session_state.operation = "OCR PDF to Text"
         if st.sidebar.button("Extract Metadata", key="s_meta"):
             st.session_state.operation = "Extract Metadata"
-        if st.sidebar.button("Ebook Converter", key="s_ebook"):
-            st.session_state.operation = "Convert Ebook"    
 else:
     if st.sidebar.button("⬅️ Back to Menu", key="s_back"):
         st.session_state.operation = None
@@ -335,7 +337,7 @@ if not op:
 else:
     st.subheader(f"▶️ Current Operation: {op}")
     # Basic operations
-    if op == "Convert Ebook":
+    if op == "Convert Ebook (code works but not on Streamlit cloud )":
         f = st.file_uploader("Upload ebook file", type=['pdf', 'epub', 'mobi', 'azw3', 'docx', 'html', 'txt'])
         out_format = st.selectbox("Output format", ['epub', 'pdf', 'mobi', 'azw3', 'docx', 'htmlz', 'txt'])
         if st.button("Convert") and f:
@@ -344,7 +346,7 @@ else:
                 st.success("✅ Ebook converted successfully!")
                 st.download_button("Download", data=converted_data, file_name=f'converted.{out_format}')
             except Exception as e:
-                st.error(f"❌ Conversion function limited due to Streamlit cloud limitations on Root access, The code works but not on streamlit clould. Download the repository folder from Github and run on your local machine. Use pip -r requirements.txt to install the script requirements.: {e}")
+                st.error(f"❌ Conversion failed: {e}")
     elif op == "Images to PDF":
         imgs = st.file_uploader("Upload images", accept_multiple_files=True, type=['png', 'jpg', 'jpeg'])
         if st.button("Convert Images to PDF") and imgs:
@@ -477,7 +479,29 @@ else:
             out = flatten_pdf(f)
             st.success("✅ PDF flattened!")
             st.download_button("Download", data=out, file_name='flattened.pdf')
+    elif op == "OCR Image to Text":
+        files = st.file_uploader("Upload Image(s) or PDF(s)", type=['png', 'jpg', 'jpeg', 'pdf'], accept_multiple_files=True)
+        if files and st.button("Extract Text"):
+            for f in files:
+            	st.subheader(f"📄 Text from {f.name}:")
+            	if f.type == "application/pdf":
+                	# Convert PDF pages to images and extract text
+                	tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+                	tmp.write(f.read())
+                	tmp.close()
+                	images = convert_from_path(tmp.name)
+                	os.unlink(tmp.name)
+                	text = ""
+                	for img in images:
+                    		text += pytesseract.image_to_string(img) + "\n"
+                	st.text_area(label="", value=text.strip(), height=250)
+            	else:
+                	# Image file
+                	image = Image.open(f)
+                	text = pytesseract.image_to_string(image)
+                	st.text_area(label="", value=text.strip(), height=250)
+       
 
 # ------------------ FOOTER -------------------
 st.markdown("---")
-st.markdown("Dev's PDF Editor |Code on Github to Modify, copy, Fork.")
+st.markdown("Dev's PDF Editor | Code on https://github.com/mahadevbk/pdfeditor ")
