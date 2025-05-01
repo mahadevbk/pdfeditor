@@ -344,7 +344,7 @@ else:
                 st.success("✅ Ebook converted successfully!")
                 st.download_button("Download", data=converted_data, file_name=f'converted.{out_format}')
             except Exception as e:
-                st.error(f"❌ Conversion failed,The code works but not on streamlit clould. Download the folder from Github and run on your local machine. Use pip -r requirements to install the script requirements.: {e}")
+                st.error(f"❌ Conversion not possible due to Streamlit cloud limitations on Root access,The code works but not on streamlit clould. Download the folder from Github and run on your local machine. Use pip -r requirements to install the script requirements.: {e}")
     elif op == "Images to PDF":
         imgs = st.file_uploader("Upload images", accept_multiple_files=True, type=['png', 'jpg', 'jpeg'])
         if st.button("Convert Images to PDF") and imgs:
