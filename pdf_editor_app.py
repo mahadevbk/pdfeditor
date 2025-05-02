@@ -13,6 +13,25 @@ import tempfile
 import zipfile
 import shutil
 
+
+def show_image_thumbnails(image_files):
+    st.subheader("🖼️ Uploaded Image Thumbnails")
+    for img_file in image_files:
+        image = Image.open(img_file)
+        st.image(image, caption=img_file.name, use_column_width=True)
+
+def show_pdf_thumbnail(pdf_file):
+    try:
+        temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+        temp_pdf.write(pdf_file.read())
+        temp_pdf.flush()
+        img = convert_from_path(temp_pdf.name, first_page=1, last_page=1)[0]
+        st.image(img, caption=f"Preview: {pdf_file.name} (Page 1)", use_column_width=True)
+        temp_pdf.close()
+        pdf_file.seek(0)
+    except Exception as e:
+        st.warning(f"⚠️ Could not generate PDF preview: {e}")
+
 # ------------------ PAGE SETTINGS -------------------
 st.set_page_config(page_title="Dev's PDF Editor", layout="wide")
 col1, col2 = st.columns([1, 8])
@@ -346,7 +365,7 @@ else:
                 st.success("✅ Ebook converted successfully!")
                 st.download_button("Download", data=converted_data, file_name=f'converted.{out_format}')
             except Exception as e:
-                st.error(f"❌ Conversion failed, Code works but not on Streamlit cloud. Download repo and run on local machine for it to work : {e}")
+                st.error(f"❌ Conversion failed: {e}")
     elif op == "Images to PDF":
         imgs = st.file_uploader("Upload images", accept_multiple_files=True, type=['png', 'jpg', 'jpeg'])
         if st.button("Convert Images to PDF") and imgs:
