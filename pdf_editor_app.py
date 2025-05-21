@@ -46,22 +46,44 @@ st.markdown("Upload PDF files or images and select an operation to manipulate yo
 def convert_ebook(input_file, output_format):
     # API configuration
     API_BASE_URL = "https://ebook-converter-api.onrender.com"
-    API_KEY = "YOUR_API_KEY"  # Replace with your actual API key
-    headers = {"Authorization": f"Bearer {API_KEY}"}
+    headers = {
+        "accept": "application/json",
+    }
 
-    # Save input file temporarily
-    input_path = os.path.join(tempfile.gettempdir(), input_file.name)
-    with open(input_path, 'wb') as f:
-        f.write(input_file.read())
+    # Prepare the files and data for the request
+    files = {
+        "file": (input_file.name, input_file.getvalue(), input_file.type)
+    }
+    data = {
+        "output_format": output_format
+    }
 
-    # Step 1: Upload the input file
-    with open(input_path, 'rb') as f:
-        files = {"file": (input_file.name, f)}
-        upload_response = requests.post(
-            f"{API_BASE_URL}/upload",
+    try:
+        # Make the API request
+        response = requests.post(
+            f"{API_BASE_URL}/convert",
             headers=headers,
-            files=files
+            files=files,
+            data=data
         )
+        
+        # Check if the request was successful
+        if response.status_code == 200:
+            # Get the converted file content
+            converted_content = response.content
+            
+            # Check if the response is actually a file (not an error message)
+            if len(converted_content) > 0:
+                return converted_content
+            else:
+                raise Exception("Empty response from API - conversion may have failed")
+        else:
+            # Try to get error details from response
+            error_details = response.json().get("detail", "Unknown error")
+            raise Exception(f"API request failed with status {response.status_code}: {error_details}")
+            
+    except Exception as e:
+        raise Exception(f"Conversion failed: {str(e)}")
     
     if upload_response.status_code != 200:
         raise Exception(f"File upload failed: {upload_response.text}")
