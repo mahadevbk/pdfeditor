@@ -46,81 +46,44 @@ st.markdown("Upload PDF files or images and select an operation to manipulate yo
 def convert_ebook(input_file, output_format):
     # API configuration
     API_BASE_URL = "https://ebook-converter-api.onrender.com"
-    headers = {
-        "accept": "application/json",
-    }
-
-    # Prepare the files and data for the request
-    files = {
-        "file": (input_file.name, input_file.getvalue(), input_file.type)
-    }
-    data = {
-        "output_format": output_format
-    }
-
+    
     try:
-        # Make the API request
+        # Prepare the file for upload
+        files = {
+            'file': (input_file.name, input_file.getvalue(), input_file.type)
+        }
+        data = {
+            'output_format': output_format
+        }
+
+        # Make the request
         response = requests.post(
             f"{API_BASE_URL}/convert",
-            headers=headers,
             files=files,
-            data=data
+            data=data,
+            timeout=30  # 30 seconds timeout
         )
-        
-        # Check if the request was successful
-        if response.status_code == 200:
-            # Get the converted file content
-            converted_content = response.content
-            
-            # Check if the response is actually a file (not an error message)
-            if len(converted_content) > 0:
-                return converted_content
-            else:
-                raise Exception("Empty response from API - conversion may have failed")
-        else:
-            # Try to get error details from response
-            error_details = response.json().get("detail", "Unknown error")
-            raise Exception(f"API request failed with status {response.status_code}: {error_details}")
-            
+
+        # Check for successful response
+        response.raise_for_status()  # This will raise an exception for 4XX/5XX status codes
+
+        # Check if we got a valid file back
+        if not response.content:
+            raise ValueError("Received empty response from API")
+
+        # Check content type to verify it's a file
+        content_type = response.headers.get('content-type', '')
+        if 'application/json' in content_type:
+            # Might be an error message in JSON format
+            error_data = response.json()
+            raise ValueError(f"API error: {error_data.get('detail', 'Unknown error')}")
+
+        return response.content
+
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"API request failed: {str(e)}")
     except Exception as e:
         raise Exception(f"Conversion failed: {str(e)}")
-    
-    if upload_response.status_code != 200:
-        raise Exception(f"File upload failed: {upload_response.text}")
-
-    # Get the file ID or reference from the upload response
-    file_id = upload_response.json().get("file_id")  # Adjust based on actual API response
-
-    # Step 2: Request conversion
-    convert_payload = {
-        "file_id": file_id,
-        "output_format": output_format
-    }
-    convert_response = requests.post(
-        f"{API_BASE_URL}/convert",
-        headers=headers,
-        json=convert_payload
-    )
-
-    if convert_response.status_code != 200:
-        raise Exception(f"Conversion failed: {convert_response.text}")
-
-    # Step 3: Download the converted file
-    output_url = convert_response.json().get("download_url")  # Adjust based on actual API response
-    output_path = os.path.join(tempfile.gettempdir(), f"converted.{output_format}")
-    
-    download_response = requests.get(output_url, headers=headers)
-    if download_response.status_code != 200:
-        raise Exception(f"Download failed: {download_response.text}")
-
-    # Save the converted file
-    with open(output_path, 'wb') as f:
-        f.write(download_response.content)
-
-    # Read and return the converted file content
-    with open(output_path, 'rb') as f:
-        return f.read()
-
 def merge_pdfs(uploaded_files):
     merger = PyPDF2.PdfMerger()
     for file in uploaded_files:
