@@ -44,11 +44,58 @@ st.markdown("Upload PDF files or images and select an operation to manipulate yo
 
 # ------------------ FUNCTIONS -------------------
 def convert_ebook(input_file, output_format):
+    # API configuration
+    API_BASE_URL = "https://ebook-converter-api.onrender.com"
+    API_KEY = "YOUR_API_KEY"  # Replace with your actual API key
+    headers = {"Authorization": f"Bearer {API_KEY}"}
+
+    # Save input file temporarily
     input_path = os.path.join(tempfile.gettempdir(), input_file.name)
     with open(input_path, 'wb') as f:
         f.write(input_file.read())
+
+    # Step 1: Upload the input file
+    with open(input_path, 'rb') as f:
+        files = {"file": (input_file.name, f)}
+        upload_response = requests.post(
+            f"{API_BASE_URL}/upload",
+            headers=headers,
+            files=files
+        )
+    
+    if upload_response.status_code != 200:
+        raise Exception(f"File upload failed: {upload_response.text}")
+
+    # Get the file ID or reference from the upload response
+    file_id = upload_response.json().get("file_id")  # Adjust based on actual API response
+
+    # Step 2: Request conversion
+    convert_payload = {
+        "file_id": file_id,
+        "output_format": output_format
+    }
+    convert_response = requests.post(
+        f"{API_BASE_URL}/convert",
+        headers=headers,
+        json=convert_payload
+    )
+
+    if convert_response.status_code != 200:
+        raise Exception(f"Conversion failed: {convert_response.text}")
+
+    # Step 3: Download the converted file
+    output_url = convert_response.json().get("download_url")  # Adjust based on actual API response
     output_path = os.path.join(tempfile.gettempdir(), f"converted.{output_format}")
-    os.system(f'ebook-convert "{input_path}" "{output_path}"')
+    
+    download_response = requests.get(output_url, headers=headers)
+    if download_response.status_code != 200:
+        raise Exception(f"Download failed: {download_response.text}")
+
+    # Save the converted file
+    with open(output_path, 'wb') as f:
+        f.write(download_response.content)
+
+    # Read and return the converted file content
     with open(output_path, 'rb') as f:
         return f.read()
 
