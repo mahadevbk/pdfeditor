@@ -32,6 +32,31 @@ def show_pdf_thumbnail(pdf_file):
     except Exception as e:
         st.warning(f"⚠️ Could not generate PDF preview: {e}")
 
+def reorder_files(uploaded_files):
+    """Allow users to reorder uploaded files."""
+    if not uploaded_files:
+        return uploaded_files
+    st.subheader("📑 Arrange File Order")
+    file_order = []
+    for i, file in enumerate(uploaded_files):
+        position = st.number_input(f"Position for {file.name}", min_value=1, max_value=len(uploaded_files), value=i+1, key=f"order_{i}")
+        file_order.append((position, file))
+    # Sort files based on user-specified positions
+    file_order.sort(key=lambda x: x[0])
+    # Handle duplicate positions by preserving original order for same positions
+    ordered_files = []
+    seen_positions = set()
+    for pos, file in file_order:
+        if pos in seen_positions:
+            # Increment position to avoid duplicates
+            pos = max(seen_positions) + 1
+        seen_positions.add(pos)
+        ordered_files.append(file)
+    st.write("Current order:")
+    for i, file in enumerate(ordered_files, 1):
+        st.write(f"{i}. {file.name}")
+    return ordered_files
+
 # ------------------ PAGE SETTINGS -------------------
 st.set_page_config(page_title="Dev's PDF Editor", layout="wide")
 col1, col2 = st.columns([1, 8])
@@ -84,6 +109,7 @@ def convert_ebook(input_file, output_format):
         raise Exception(f"API request failed: {str(e)}")
     except Exception as e:
         raise Exception(f"Conversion failed: {str(e)}")
+
 def merge_pdfs(uploaded_files):
     merger = PyPDF2.PdfMerger()
     for file in uploaded_files:
@@ -131,18 +157,6 @@ def images_to_pdf(image_files):
         out.write(img2pdf.convert(paths, rotation=img2pdf.Rotation.ifvalid))
         out.seek(0)
         return out
-#def images_to_pdf(image_files):
-#    with tempfile.TemporaryDirectory() as tmp:
-#        paths = []
-#        for img in image_files:
-#            p = os.path.join(tmp, img.name)
-#            with open(p, 'wb') as f:
-#                f.write(img.read())
-#            paths.append(p)
-#        out = io.BytesIO()
-#        out.write(img2pdf.convert(paths))
-#        out.seek(0)
-#        return out
 
 def pdf_to_images(uploaded_file):
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
@@ -400,12 +414,17 @@ else:
                 st.error(f"❌ Conversion failed: {e}")
     elif op == "Images to PDF":
         imgs = st.file_uploader("Upload images", accept_multiple_files=True, type=['png', 'jpg', 'jpeg'])
-        if st.button("Convert Images to PDF") and imgs:
-            out = images_to_pdf(imgs)
-            st.success("✅ Converted!")
-            st.download_button("Download PDF", data=out, file_name='images.pdf')
+        if imgs:
+            ordered_imgs = reorder_files(imgs)
+            show_image_thumbnails(ordered_imgs)
+            if st.button("Convert Images to PDF"):
+                out = images_to_pdf(ordered_imgs)
+                st.success("✅ Converted!")
+                st.download_button("Download PDF", data=out, file_name='images.pdf')
     elif op == "PDF to Images":
         f = st.file_uploader("Upload PDF", type='pdf')
+        if f:
+            show_pdf_thumbnail(f)
         if st.button("Convert PDF to Images") and f:
             outs = pdf_to_images(f)
             buf = io.BytesIO()
@@ -417,24 +436,34 @@ else:
             st.download_button("Download ZIP", data=buf, file_name='pages.zip')
     elif op == "PDF to DOCX":
         f = st.file_uploader("Upload PDF", type='pdf')
+        if f:
+            show_pdf_thumbnail(f)
         if st.button("Convert to DOCX") and f:
             out = pdf_to_docx(f)
             st.success("✅ Converted!")
             st.download_button("Download DOCX", data=out, file_name='out.docx')
     elif op == "PDF to Spreadsheet":
         f = st.file_uploader("Upload PDF", type='pdf')
+        if f:
+            show_pdf_thumbnail(f)
         if st.button("Convert to XLSX") and f:
             out = pdf_to_spreadsheet(f)
             st.success("✅ Converted!")
             st.download_button("Download XLSX", data=out, file_name='out.xlsx')
     elif op == "Merge PDFs":
         fs = st.file_uploader("Upload PDFs", accept_multiple_files=True, type='pdf')
-        if st.button("Merge PDFs") and fs:
-            out = merge_pdfs(fs)
-            st.success("✅ Merged!")
-            st.download_button("Download", data=out, file_name='merged.pdf')
+        if fs:
+            ordered_fs = reorder_files(fs)
+            for f in ordered_fs:
+                show_pdf_thumbnail(f)
+            if st.button("Merge PDFs"):
+                out = merge_pdfs(ordered_fs)
+                st.success("✅ Merged!")
+                st.download_button("Download", data=out, file_name='merged.pdf')
     elif op == "Split PDF":
         f = st.file_uploader("Upload PDF", type='pdf')
+        if f:
+            show_pdf_thumbnail(f)
         rng = st.text_input("Ranges e.g. 1-3,5-7")
         if st.button("Split PDF") and f and rng:
             ofs = split_pdf(f, rng)
@@ -443,6 +472,8 @@ else:
                 st.download_button(f"Part {i}", data=b, file_name=f'part{i}.pdf')
     elif op == "Rotate PDF":
         f = st.file_uploader("Upload PDF", type='pdf')
+        if f:
+            show_pdf_thumbnail(f)
         ang = st.selectbox("Angle", [90, 180, 270])
         if st.button("Rotate PDF") and f:
             out = rotate_pdf(f, ang)
@@ -450,6 +481,8 @@ else:
             st.download_button("Download", data=out, file_name='rotated.pdf')
     elif op == "Crop PDF":
         f = st.file_uploader("Upload PDF", type='pdf')
+        if f:
+            show_pdf_thumbnail(f)
         c1, c2, c3, c4 = st.columns(4)
         x0 = c1.number_input("X0", value=0.0)
         y0 = c2.number_input("Y0", value=0.0)
@@ -461,6 +494,8 @@ else:
             st.download_button("Download", data=out, file_name='cropped.pdf')
     elif op == "Add Watermark":
         f = st.file_uploader("Upload PDF", type='pdf')
+        if f:
+            show_pdf_thumbnail(f)
         txt = st.text_input("Watermark Text", "Confidential")
         if st.button("Add Watermark") and f:
             out = add_watermark(f, txt)
@@ -468,12 +503,16 @@ else:
             st.download_button("Download", data=out, file_name='wm.pdf')
     elif op == "Compress PDF":
         f = st.file_uploader("Upload PDF", type='pdf')
+        if f:
+            show_pdf_thumbnail(f)
         if st.button("Compress PDF") and f:
             out = compress_pdf(f)
             st.success("✅ Compressed!")
             st.download_button("Download", data=out, file_name='compressed.pdf')
     elif op == "Extract Metadata":
         f = st.file_uploader("Upload PDF", type='pdf')
+        if f:
+            show_pdf_thumbnail(f)
         if st.button("Extract Metadata") and f:
             out = extract_metadata(f)
             st.success("✅ Metadata!")
@@ -481,6 +520,8 @@ else:
     # Advanced
     elif op == "Encrypt PDF":
         f = st.file_uploader("Upload PDF to Encrypt", type='pdf')
+        if f:
+            show_pdf_thumbnail(f)
         pwd = st.text_input("Password", type='password')
         if st.button("Encrypt PDF") and f and pwd:
             out = encrypt_pdf(f, pwd)
@@ -488,6 +529,8 @@ else:
             st.download_button("Download", data=out, file_name='encrypted.pdf')
     elif op == "Decrypt PDF":
         f = st.file_uploader("Upload Encrypted PDF", type='pdf')
+        if f:
+            show_pdf_thumbnail(f)
         pwd = st.text_input("Password", type='password')
         if st.button("Decrypt PDF") and f and pwd:
             out = decrypt_pdf(f, pwd)
@@ -495,6 +538,8 @@ else:
             st.download_button("Download", data=out, file_name='decrypted.pdf')
     elif op == "Delete Pages":
         f = st.file_uploader("Upload PDF", type='pdf')
+        if f:
+            show_pdf_thumbnail(f)
         rng = st.text_input("Pages to delete, e.g. 1,3,5")
         if st.button("Delete Pages") and f and rng:
             try:
@@ -506,7 +551,11 @@ else:
                 st.error("Invalid pages input")
     elif op == "Insert Pages":
         base = st.file_uploader("Upload Base PDF", type='pdf')
+        if base:
+            show_pdf_thumbnail(base)
         ins = st.file_uploader("Upload PDF to Insert", type='pdf')
+        if ins:
+            show_pdf_thumbnail(ins)
         pos = st.number_input("Position (0-based)", min_value=0, step=1)
         if st.button("Insert Pages") and base and ins:
             out = insert_pages(base, ins, pos)
@@ -514,44 +563,56 @@ else:
             st.download_button("Download", data=out, file_name='inserted.pdf')
     elif op == "Extract Images":
         f = st.file_uploader("Upload PDF", type='pdf')
+        if f:
+            show_pdf_thumbnail(f)
         if st.button("Extract Images") and f:
             out = extract_images(f)
             st.success("✅ Images extracted!")
             st.download_button("Download ZIP", data=out, file_name='images.zip')
     elif op == "Add Page Numbers":
         f = st.file_uploader("Upload PDF", type='pdf')
+        if f:
+            show_pdf_thumbnail(f)
         if st.button("Add Page Numbers") and f:
             out = add_page_numbers(f)
             st.success("✅ Page numbers added!")
             st.download_button("Download", data=out, file_name='pgnums.pdf')
     elif op == "Flatten PDF":
         f = st.file_uploader("Upload PDF to Flatten", type='pdf')
+        if f:
+            show_pdf_thumbnail(f)
         if st.button("Flatten PDF") and f:
             out = flatten_pdf(f)
             st.success("✅ PDF flattened!")
             st.download_button("Download", data=out, file_name='flattened.pdf')
     elif op == "OCR Image to Text":
         files = st.file_uploader("Upload Image(s) or PDF(s)", type=['png', 'jpg', 'jpeg', 'pdf'], accept_multiple_files=True)
+        if files:
+            for f in files:
+                if f.type == "application/pdf":
+                    show_pdf_thumbnail(f)
+                else:
+                    image = Image.open(f)
+                    st.image(image, caption=f.name, use_column_width=True)
         if files and st.button("Extract Text"):
             for f in files:
-            	st.subheader(f"📄 Text from {f.name}:")
-            	if f.type == "application/pdf":
-                	# Convert PDF pages to images and extract text
-                	tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
-                	tmp.write(f.read())
-                	tmp.close()
-                	images = convert_from_path(tmp.name)
-                	os.unlink(tmp.name)
-                	text = ""
-                	for img in images:
-                    		text += pytesseract.image_to_string(img) + "\n"
-                	st.text_area(label="", value=text.strip(), height=250)
-            	else:
-                	# Image file
-                	image = Image.open(f)
-                	text = pytesseract.image_to_string(image)
-                	st.text_area(label="", value=text.strip(), height=250)
-       
+                st.subheader(f"📄 Text from {f.name}:")
+                if f.type == "application/pdf":
+                    # Convert PDF pages to images and extract text
+                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+                    tmp.write(f.read())
+                    tmp.close()
+                    images = convert_from_path(tmp.name)
+                    os.unlink(tmp.name)
+                    text = ""
+                    for img in images:
+                        text += pytesseract.image_to_string(img) + "\n"
+                    st.text_area(label="", value=text.strip(), height=250)
+                else:
+                    # Image file
+                    image = Image.open(f)
+                    text = pytesseract.image_to_string(image)
+                    st.text_area(label="", value=text.strip(), height=250)
 
 # ------------------ FOOTER -------------------
 st.markdown("---")
