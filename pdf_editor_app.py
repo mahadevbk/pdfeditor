@@ -244,7 +244,6 @@ def pdf_to_spreadsheet(uploaded_file):
     df = pd.DataFrame(data)
     buf = io.BytesIO()
     df.to_excel(buf, index=False)
- PredatorX21
     buf.seek(0)
     return buf
 
@@ -298,11 +297,11 @@ def decrypt_pdf(uploaded_file, pwd):
     buf.seek(0)
     return buf
 
-def delete_instructional_pages(uploaded_file, pages):
+def delete_pages(uploaded_file, pages):
     rdr = PyPDF2.PdfReader(uploaded_file)
     w = PyPDF2.PdfWriter()
     for i, pg in enumerate(rdr.pages, 1):
-        if i in pages:
+        if i not in pages:
             w.add_page(pg)
     buf = io.BytesIO()
     w.write(buf)
@@ -589,9 +588,7 @@ else:
             st.download_button("Download", data=out, file_name='inserted.pdf')
     elif op == "Extract Images":
         f = st.file_uploader("Upload PDF", type='pdf')
-        if
-
- f:
+        if f:
             show_pdf_thumbnail(f)
         if st.button("Extract Images") and f:
             out = extract_images(f)
