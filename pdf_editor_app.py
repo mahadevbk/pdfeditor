@@ -149,14 +149,36 @@ def images_to_pdf(image_files):
     with tempfile.TemporaryDirectory() as tmp:
         paths = []
         for img in image_files:
-            p = os.path.join(tmp, img.name)
-            with open(p, 'wb') as f:
-                f.write(img.read())
-            paths.append(p)
-        out = io.BytesIO()
-        out.write(img2pdf.convert(paths, rotation=img2pdf.Rotation.ifvalid))
-        out.seek(0)
-        return out
+            # Validate image format
+            if img.type not in ['image/png', 'image/jpeg', 'image/jpg']:
+                st.error(f"Unsupported image format for {img.name}. Please use PNG or JPEG.")
+                return None
+            try:
+                # Save image to temporary file
+                p = os.path.join(tmp, img.name)
+                with open(p, 'wb') as f:
+                    f.write(img.read())
+                # Verify image can be opened
+                Image.open(p).verify()
+                paths.append(p)
+            except Exception as e:
+                st.error(f"Error processing {img.name}: {str(e)}")
+                return None
+        try:
+            out = io.BytesIO()
+            # Try with rotation first
+            try:
+                out.write(img2pdf.convert(paths, rotation=img2pdf.Rotation.ifvalid))
+            except Exception as e:
+                st.warning(f"Rotation failed: {str(e)}. Attempting without rotation.")
+                out.seek(0)
+                out.truncate(0)
+                out.write(img2pdf.convert(paths))  # Fallback without rotation
+            out.seek(0)
+            return out
+        except Exception as e:
+            st.error(f"Failed to convert images to PDF: {str(e)}")
+            return None
 
 def pdf_to_images(uploaded_file):
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
@@ -222,6 +244,7 @@ def pdf_to_spreadsheet(uploaded_file):
     df = pd.DataFrame(data)
     buf = io.BytesIO()
     df.to_excel(buf, index=False)
+ PredatorX21
     buf.seek(0)
     return buf
 
@@ -275,11 +298,11 @@ def decrypt_pdf(uploaded_file, pwd):
     buf.seek(0)
     return buf
 
-def delete_pages(uploaded_file, pages):
+def delete_instructional_pages(uploaded_file, pages):
     rdr = PyPDF2.PdfReader(uploaded_file)
     w = PyPDF2.PdfWriter()
     for i, pg in enumerate(rdr.pages, 1):
-        if i not in pages:
+        if i in pages:
             w.add_page(pg)
     buf = io.BytesIO()
     w.write(buf)
@@ -415,12 +438,15 @@ else:
     elif op == "Images to PDF":
         imgs = st.file_uploader("Upload images", accept_multiple_files=True, type=['png', 'jpg', 'jpeg'])
         if imgs:
+            show_image_thumbnails(imgs)  # Show thumbnails before reordering
             ordered_imgs = reorder_files(imgs)
-            show_image_thumbnails(ordered_imgs)
             if st.button("Convert Images to PDF"):
                 out = images_to_pdf(ordered_imgs)
-                st.success("✅ Converted!")
-                st.download_button("Download PDF", data=out, file_name='images.pdf')
+                if out:
+                    st.success("✅ Converted!")
+                    st.download_button("Download PDF", data=out, file_name='images.pdf')
+                else:
+                    st.error("❌ Conversion failed. Please check the images and try again.")
     elif op == "PDF to Images":
         f = st.file_uploader("Upload PDF", type='pdf')
         if f:
@@ -563,7 +589,9 @@ else:
             st.download_button("Download", data=out, file_name='inserted.pdf')
     elif op == "Extract Images":
         f = st.file_uploader("Upload PDF", type='pdf')
-        if f:
+        if
+
+ f:
             show_pdf_thumbnail(f)
         if st.button("Extract Images") and f:
             out = extract_images(f)
