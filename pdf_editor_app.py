@@ -12,13 +12,17 @@ import img2pdf
 import tempfile
 import zipfile
 import shutil
-
+import requests
+import re
 
 def show_image_thumbnails(image_files):
     st.subheader("🖼️ Uploaded Image Thumbnails")
     for img_file in image_files:
-        image = Image.open(img_file)
-        st.image(image, caption=img_file.name, use_column_width=True)
+        try:
+            image = Image.open(img_file)
+            st.image(image, caption=img_file.name, use_column_width=True)
+        except Exception as e:
+            st.warning(f"⚠️ Could not display thumbnail for {img_file.name}: {str(e)}")
 
 def show_pdf_thumbnail(pdf_file):
     try:
@@ -148,22 +152,34 @@ def rotate_pdf(uploaded_file, rotation_angle):
 def images_to_pdf(image_files):
     with tempfile.TemporaryDirectory() as tmp:
         paths = []
+        valid_images = []
         for img in image_files:
             # Validate image format
             if img.type not in ['image/png', 'image/jpeg', 'image/jpg']:
-                st.error(f"Unsupported image format for {img.name}. Please use PNG or JPEG.")
-                return None
+                st.warning(f"Skipped {img.name}: Unsupported format. Please use PNG or JPEG.")
+                continue
+            # Sanitize filename to remove spaces and special characters
+            safe_name = re.sub(r'[^a-zA-Z0-9._-]', '_', img.name)
             try:
+                # Verify image content before saving
+                img.seek(0)
+                image = Image.open(img)
+                image.verify()  # Verify image integrity
+                img.seek(0)  # Reset file pointer after verification
                 # Save image to temporary file
-                p = os.path.join(tmp, img.name)
+                p = os.path.join(tmp, safe_name)
                 with open(p, 'wb') as f:
                     f.write(img.read())
-                # Verify image can be opened
+                # Reopen and verify saved image
                 Image.open(p).verify()
                 paths.append(p)
+                valid_images.append(img)  # Track valid images
             except Exception as e:
-                st.error(f"Error processing {img.name}: {str(e)}")
-                return None
+                st.warning(f"Skipped {img.name}: Invalid or corrupted image ({str(e)})")
+                continue
+        if not paths:
+            st.error("❌ No valid images to convert. Please upload valid PNG or JPEG images.")
+            return None
         try:
             out = io.BytesIO()
             # Try with rotation first
@@ -617,8 +633,11 @@ else:
                 if f.type == "application/pdf":
                     show_pdf_thumbnail(f)
                 else:
-                    image = Image.open(f)
-                    st.image(image, caption=f.name, use_column_width=True)
+                    try:
+                        image = Image.open(f)
+                        st.image(image, caption=f.name, use_column_width=True)
+                    except Exception as e:
+                        st.warning(f"⚠️ Could not display thumbnail for {f.name}: {str(e)}")
         if files and st.button("Extract Text"):
             for f in files:
                 st.subheader(f"📄 Text from {f.name}:")
@@ -635,9 +654,12 @@ else:
                     st.text_area(label="", value=text.strip(), height=250)
                 else:
                     # Image file
-                    image = Image.open(f)
-                    text = pytesseract.image_to_string(image)
-                    st.text_area(label="", value=text.strip(), height=250)
+                    try:
+                        image = Image.open(f)
+                        text = pytesseract.image_to_string(image)
+                        st.text_area(label="", value=text.strip(), height=250)
+                    except Exception as e:
+                        st.error(f"Failed to extract text from {f.name}: {str(e)}")
 
 # ------------------ FOOTER -------------------
 st.markdown("---")
