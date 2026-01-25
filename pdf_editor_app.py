@@ -139,6 +139,7 @@ if op == "Merge":
                 imgs[0].save(buf, format="PNG")
                 st.session_state.thumbs[file.name] = base64.b64encode(buf.getvalue()).decode()
 
+        st.info("Drag the File names to reorder the PDF sequence of files.")
         sorted_filenames = sort_items(file_names, direction="horizontal")
         
         # Grid View
