@@ -143,6 +143,7 @@ if op == "Merge":
         sorted_filenames = sort_items(file_names, direction="horizontal")
         
         # Grid View
+        st.info("Optional Rotate for each individual file...")
         cols = st.columns(5)
         for i, name in enumerate(sorted_filenames):
             with cols[i % 5]:
