@@ -17,15 +17,13 @@ from streamlit_sortables import sort_items
 # ------------------ PAGE SETTINGS -------------------
 st.set_page_config(page_title="Dev's PDF Editor", layout="wide")
 
-# Custom CSS for UI Polish and Reorder Bar Legibility
+# Custom CSS for UI Legibility
 st.markdown(f"""
     <style>
-    /* Fix legibility for sortable items: white text on dark primary color */
     .stSortableList div div div, .stSortableList span, .stSortableList p {{
         color: #ffffff !important; 
         font-weight: 600 !important;
     }}
-    /* Card style for thumbnails */
     .thumb-container {{
         background-color: #0d5384;
         padding: 10px;
@@ -58,11 +56,7 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
-col1, col2 = st.columns([1, 8])
-with col1:
-    st.write("## 📑") 
-with col2:
-    st.title("Dev's PDF Editor")
+st.title("📑 Dev's PDF Editor")
 
 # ------------------ SESSION STATE -------------------
 if 'operation' not in st.session_state:
@@ -89,45 +83,37 @@ def get_visual_merge_output(sorted_filenames, file_map, rotation_data):
     output.seek(0)
     return output
 
-def split_pdf(uploaded_file, page_ranges):
-    reader = PyPDF2.PdfReader(uploaded_file)
-    output_files = []
-    for rng in page_ranges.split(','):
-        try:
-            start, end = map(int, rng.split('-'))
-            writer = PyPDF2.PdfWriter()
-            for i in range(start-1, min(end, len(reader.pages))):
-                writer.add_page(reader.pages[i])
-            buf = io.BytesIO()
-            writer.write(buf)
-            buf.seek(0)
-            output_files.append(buf)
-        except: continue
-    return output_files
+def add_watermark(uploaded_file, text):
+    doc = fitz.open(stream=uploaded_file.read(), filetype='pdf')
+    for p in doc:
+        p.insert_text((50, 50), text, fontsize=30, color=(0.7, 0.7, 0.7), rotate=45)
+    buf = io.BytesIO()
+    doc.save(buf)
+    doc.close()
+    buf.seek(0)
+    return buf
 
-def images_to_pdf(image_files):
-    with tempfile.TemporaryDirectory() as tmp:
-        paths = []
-        for img in image_files:
-            p = os.path.join(tmp, img.name)
-            with open(p, 'wb') as f:
-                f.write(img.read())
-            paths.append(p)
-        out = io.BytesIO()
-        out.write(img2pdf.convert(paths, rotation=img2pdf.Rotation.ifvalid))
-        out.seek(0)
-        return out
+def flatten_pdf(uploaded_file):
+    doc = fitz.open(stream=uploaded_file.read(), filetype='pdf')
+    for p in doc:
+        p.flatten_annotations()
+    buf = io.BytesIO()
+    doc.save(buf)
+    doc.close()
+    buf.seek(0)
+    return buf
 
-# ------------------ SIDEBAR & MENU -------------------
-st.sidebar.title("📑 Menu")
+# ------------------ SIDEBAR MENU -------------------
+st.sidebar.title("🔧 Tools")
 if st.session_state.operation is None:
-    with st.sidebar.expander("🔄 Convert"):
-        if st.sidebar.button("Image to Text"): st.session_state.operation = "OCR Image to Text"
+    with st.sidebar.expander("🔄 Convert & OCR"):
         if st.sidebar.button("Images to PDF"): st.session_state.operation = "Images to PDF"
         if st.sidebar.button("PDF to Images"): st.session_state.operation = "PDF to Images"
-    with st.sidebar.expander("🔧 Edit"):
-        if st.sidebar.button("Merge PDFs"): st.session_state.operation = "Merge PDFs"
-        if st.sidebar.button("Split PDF"): st.session_state.operation = "Split PDF"
+        if st.sidebar.button("OCR PDF/Image to Text"): st.session_state.operation = "OCR"
+    with st.sidebar.expander("✏️ Edit & Merge"):
+        if st.sidebar.button("Visual Merge & Rotate"): st.session_state.operation = "Merge"
+        if st.sidebar.button("Add Watermark"): st.session_state.operation = "Watermark"
+        if st.sidebar.button("Flatten PDF"): st.session_state.operation = "Flatten"
 else:
     if st.sidebar.button("⬅️ Back to Menu"):
         st.session_state.operation = None
@@ -135,58 +121,90 @@ else:
         st.session_state.thumbs = {}
         st.rerun()
 
-# ------------------ MAIN UI -------------------
+# ------------------ MAIN UI LOGIC -------------------
 op = st.session_state.operation
 
-if not op:
-    st.write("Select an operation from the sidebar to get started.")
-elif op == "Merge PDFs":
-    st.subheader("▶️ Visual PDF Merger & Rotator")
+if op == "Merge":
+    st.subheader("▶️ Visual PDF Merger")
     fs = st.file_uploader("Upload PDFs", accept_multiple_files=True, type='pdf')
-    
     if fs:
-        file_names = []
-        file_map = {}
+        file_names = [f.name for f in fs]
+        file_map = {f.name: f for f in fs}
+        
+        # Thumbnail generation
         for file in fs:
-            file_names.append(file.name)
-            file_map[file.name] = file
             if file.name not in st.session_state.thumbs:
-                try:
-                    imgs = convert_from_bytes(file.getvalue(), first_page=1, last_page=1)
-                    buf = io.BytesIO()
-                    imgs[0].save(buf, format="PNG")
-                    st.session_state.thumbs[file.name] = base64.b64encode(buf.getvalue()).decode()
-                except Exception as e:
-                    st.error(f"Error previewing {file.name}: {e}")
+                imgs = convert_from_bytes(file.getvalue(), first_page=1, last_page=1)
+                buf = io.BytesIO()
+                imgs[0].save(buf, format="PNG")
+                st.session_state.thumbs[file.name] = base64.b64encode(buf.getvalue()).decode()
 
-        st.write("### 1. Set Order")
         sorted_filenames = sort_items(file_names, direction="horizontal")
+        
+        # Grid View
+        cols = st.columns(5)
+        for i, name in enumerate(sorted_filenames):
+            with cols[i % 5]:
+                rot = st.session_state.rotation_data.get(name, 0)
+                img_b64 = st.session_state.thumbs.get(name)
+                st.markdown(f'<div class="thumb-container"><img src="data:image/png;base64,{img_b64}" style="transform: rotate({rot}deg);"></div>', unsafe_allow_html=True)
+                if st.button(f"Rotate ↻", key=f"rot_{name}"):
+                    st.session_state.rotation_data[name] = (rot + 90) % 360
+                    st.rerun()
+                st.markdown(f'<div class="file-label"><b>{name}</b></div>', unsafe_allow_html=True)
 
-        st.write("### 2. Preview & Rotation")
-        max_cols = 5
-        for i in range(0, len(sorted_filenames), max_cols):
-            batch = sorted_filenames[i:i + max_cols]
-            cols = st.columns(max_cols)
-            for j, name in enumerate(batch):
-                with cols[j]:
-                    rot = st.session_state.rotation_data.get(name, 0)
-                    img_b64 = st.session_state.thumbs.get(name)
-                    if img_b64:
-                        st.markdown(f'''<div class="thumb-container">
-                            <img src="data:image/png;base64,{img_b64}" style="transform: rotate({rot}deg); transition: transform 0.3s ease;">
-                            </div>''', unsafe_allow_html=True)
-                    if st.button(f"Rotate ↻", key=f"rot_{name}_{i}_{j}"):
-                        st.session_state.rotation_data[name] = (rot + 90) % 360
-                        st.rerun()
-                    st.markdown(f'<div class="file-label"><b>{name}</b><br>Current: {rot}°</div>', unsafe_allow_html=True)
+        if st.button("Merge and Download", type="primary"):
+            out = get_visual_merge_output(sorted_filenames, file_map, st.session_state.rotation_data)
+            st.download_button("📥 Download Result", data=out, file_name="merged.pdf")
 
-        st.divider()
-        if st.button("Merge and Download PDF", type="primary", use_container_width=True):
-            output = get_visual_merge_output(sorted_filenames, file_map, st.session_state.rotation_data)
-            st.success("✅ Merged!")
-            st.download_button("Download Merged PDF", data=output, file_name='merged.pdf', use_container_width=True)
+elif op == "Watermark":
+    f = st.file_uploader("Upload PDF", type='pdf')
+    txt = st.text_input("Watermark Text", "DRAFT")
+    if f and st.button("Apply Watermark"):
+        out = add_watermark(f, txt)
+        st.download_button("Download Watermarked PDF", data=out, file_name="watermarked.pdf")
 
-# [Other operation blocks like Split PDF or OCR would go here as per the local version]
+elif op == "Flatten":
+    f = st.file_uploader("Upload PDF", type='pdf')
+    if f and st.button("Flatten"):
+        out = flatten_pdf(f)
+        st.download_button("Download Flattened PDF", data=out, file_name="flattened.pdf")
 
-st.markdown("---")
-st.markdown("Dev's PDF Editor | Support: [mahadevbk/pdfeditor](https://github.com/mahadevbk/pdfeditor)")
+elif op == "OCR":
+    files = st.file_uploader("Upload Image or PDF", accept_multiple_files=True)
+    if files and st.button("Extract Text"):
+        for f in files:
+            if f.type == "application/pdf":
+                imgs = convert_from_bytes(f.read())
+                text = "".join([pytesseract.image_to_string(img) for img in imgs])
+            else:
+                text = pytesseract.image_to_string(Image.open(f))
+            st.text_area(f"Result: {f.name}", text, height=200)
+
+elif op == "Images to PDF":
+    imgs = st.file_uploader("Upload Images", accept_multiple_files=True, type=['png', 'jpg', 'jpeg'])
+    if imgs and st.button("Generate PDF"):
+        # We need to save to temp files for img2pdf specifically
+        with tempfile.TemporaryDirectory() as tmpdir:
+            paths = []
+            for img in imgs:
+                p = os.path.join(tmpdir, img.name)
+                with open(p, "wb") as f: f.write(img.read())
+                paths.append(p)
+            pdf_bytes = img2pdf.convert(paths)
+            st.download_button("Download PDF", data=pdf_bytes, file_name="images.pdf")
+
+elif op == "PDF to Images":
+    f = st.file_uploader("Upload PDF", type='pdf')
+    if f and st.button("Convert to Images"):
+        imgs = convert_from_bytes(f.read())
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, "w") as z:
+            for i, img in enumerate(imgs):
+                img_buf = io.BytesIO()
+                img.save(img_buf, format="PNG")
+                z.writestr(f"page_{i+1}.png", img_buf.getvalue())
+        st.download_button("Download ZIP of Images", data=zip_buf.getvalue(), file_name="pages.zip")
+
+else:
+    st.info("Select a tool from the sidebar to begin.")
