@@ -240,36 +240,69 @@ def flatten_pdf(uploaded_file):
     return buf
 
 # ------------------ SIDEBAR & MENU -------------------
+# ------------------ SIDEBAR & MENU -------------------
 st.sidebar.title("📑 Menu")
+
+# Define categories for logic
+categories = {
+    "Convert": ["OCR Image to Text", "Images to PDF", "PDF to Images", "PDF to DOCX"],
+    "Edit": ["Merge PDFs", "Split PDF", "Rotate PDF", "Crop PDF", "Add Watermark", "Compress PDF"],
+    "Security": ["Encrypt PDF", "Decrypt PDF"],
+    "Pages": ["Delete Pages", "Insert Pages", "Add Page Numbers", "Flatten PDF"],
+    "Images": ["Extract Images"],
+    "Extract": ["OCR PDF to Text", "Extract Metadata"]
+}
+
 if st.session_state.operation is None:
-    with st.sidebar.expander("🔄 Convert"):
+    # --- Helper function to style labels ---
+    def get_label(name, icon):
+        # If an operation from this category is selected, you could mark it here
+        # Since we only show expanders when operation is None, we just use defaults
+        return f"{icon} {name}"
+
+    with st.sidebar.expander(get_label("Convert", "🔄")):
+        if st.button("Image to Text"): st.session_state.operation = "OCR Image to Text"; st.rerun()
+        if st.button("Images to PDF"): st.session_state.operation = "Images to PDF"; st.rerun()
+        if st.button("PDF to Images"): st.session_state.operation = "PDF to Images"; st.rerun()
+        if st.button("PDF to DOCX"): st.session_state.operation = "PDF to DOCX"; st.rerun()
         
-        if st.sidebar.button("Image to Text"): st.session_state.operation = "OCR Image to Text"
-        if st.sidebar.button("Images to PDF"): st.session_state.operation = "Images to PDF"
-        if st.sidebar.button("PDF to Images"): st.session_state.operation = "PDF to Images"
-        if st.sidebar.button("PDF to DOCX"): st.session_state.operation = "PDF to DOCX"
-    with st.sidebar.expander("🔧 Edit"):
-        if st.sidebar.button("Merge PDFs"): st.session_state.operation = "Merge PDFs"
-        if st.sidebar.button("Split PDF"): st.session_state.operation = "Split PDF"
-        if st.sidebar.button("Rotate PDF"): st.session_state.operation = "Rotate PDF"
-        if st.sidebar.button("Crop PDF"): st.session_state.operation = "Crop PDF"
-        if st.sidebar.button("Add Watermark"): st.session_state.operation = "Add Watermark"
-        if st.sidebar.button("Compress PDF"): st.session_state.operation = "Compress PDF"
-    with st.sidebar.expander("🔒 Security"):
-        if st.sidebar.button("Encrypt PDF"): st.session_state.operation = "Encrypt PDF"
-        if st.sidebar.button("Decrypt PDF"): st.session_state.operation = "Decrypt PDF"
-    with st.sidebar.expander("✂️ Pages"):
-        if st.sidebar.button("Delete Pages"): st.session_state.operation = "Delete Pages"
-        if st.sidebar.button("Insert Pages"): st.session_state.operation = "Insert Pages"
-        if st.sidebar.button("Add Page Numbers"): st.session_state.operation = "Add Page Numbers"
-        if st.sidebar.button("Flatten PDF"): st.session_state.operation = "Flatten PDF"
-    with st.sidebar.expander("🖼️ Images"):
-        if st.sidebar.button("Extract Images"): st.session_state.operation = "Extract Images"
-    with st.sidebar.expander("🔍 Extract"):
-        if st.sidebar.button("OCR PDF to Text"): st.session_state.operation = "OCR PDF to Text"
-        if st.sidebar.button("Extract Metadata"): st.session_state.operation = "Extract Metadata"
+    with st.sidebar.expander(get_label("Edit", "🔧")):
+        if st.button("Merge PDFs"): st.session_state.operation = "Merge PDFs"; st.rerun()
+        if st.button("Split PDF"): st.session_state.operation = "Split PDF"; st.rerun()
+        if st.button("Rotate PDF"): st.session_state.operation = "Rotate PDF"; st.rerun()
+        if st.button("Crop PDF"): st.session_state.operation = "Crop PDF"; st.rerun()
+        if st.button("Add Watermark"): st.session_state.operation = "Add Watermark"; st.rerun()
+        if st.button("Compress PDF"): st.session_state.operation = "Compress PDF"; st.rerun()
+
+    with st.sidebar.expander(get_label("Security", "🔒")):
+        if st.button("Encrypt PDF"): st.session_state.operation = "Encrypt PDF"; st.rerun()
+        if st.button("Decrypt PDF"): st.session_state.operation = "Decrypt PDF"; st.rerun()
+
+    with st.sidebar.expander(get_label("Pages", "✂️")):
+        if st.button("Delete Pages"): st.session_state.operation = "Delete Pages"; st.rerun()
+        if st.button("Insert Pages"): st.session_state.operation = "Insert Pages"; st.rerun()
+        if st.button("Add Page Numbers"): st.session_state.operation = "Add Page Numbers"; st.rerun()
+        if st.button("Flatten PDF"): st.session_state.operation = "Flatten PDF"; st.rerun()
+
+    with st.sidebar.expander(get_label("Images", "🖼️")):
+        if st.button("Extract Images"): st.session_state.operation = "Extract Images"; st.rerun()
+
+    with st.sidebar.expander(get_label("Extract", "🔍")):
+        if st.button("OCR PDF to Text"): st.session_state.operation = "OCR PDF to Text"; st.rerun()
+        if st.button("Extract Metadata"): st.session_state.operation = "Extract Metadata"; st.rerun()
+
 else:
-    if st.sidebar.button("⬅️ Back to Menu"):
+    # Identify which category the current operation belongs to
+    current_cat = "Unknown"
+    for cat, ops in categories.items():
+        if st.session_state.operation in ops:
+            current_cat = cat
+            break
+    
+    st.sidebar.info(f"**Category:** {current_cat}")
+    st.sidebar.success(f"**Active:** {st.session_state.operation}")
+    
+    if st.sidebar.button("⬅️ Back to Menu", use_container_width=True):
         st.session_state.operation = None
         st.session_state.rotation_data = {}
         st.session_state.thumbs = {}
