@@ -243,7 +243,7 @@ def flatten_pdf(uploaded_file):
 st.sidebar.title("📑 Menu")
 if st.session_state.operation is None:
     with st.sidebar.expander("🔄 Convert"):
-        if st.sidebar.button("Ebook Converter"): st.session_state.operation = "Convert Ebook"
+        
         if st.sidebar.button("Image to Text"): st.session_state.operation = "OCR Image to Text"
         if st.sidebar.button("Images to PDF"): st.session_state.operation = "Images to PDF"
         if st.sidebar.button("PDF to Images"): st.session_state.operation = "PDF to Images"
