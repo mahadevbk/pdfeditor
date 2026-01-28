@@ -89,14 +89,7 @@ def get_visual_merge_output(sorted_filenames, file_map, rotation_data):
     output.seek(0)
     return output
 
-def convert_ebook(input_file, output_format):
-    input_path = os.path.join(tempfile.gettempdir(), input_file.name)
-    with open(input_path, 'wb') as f:
-        f.write(input_file.read())
-    output_path = os.path.join(tempfile.gettempdir(), f"converted.{output_format}")
-    os.system(f'ebook-convert "{input_path}" "{output_path}"')
-    with open(output_path, 'rb') as f:
-        return f.read()
+
 
 def split_pdf(uploaded_file, page_ranges):
     reader = PyPDF2.PdfReader(uploaded_file)
